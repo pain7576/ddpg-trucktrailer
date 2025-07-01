@@ -83,7 +83,12 @@ class Truck_trailer_Env_1(gym.Env):
             dtype=np.float32
         )
         # Action space: steering angle
-        self.action_space = spaces.Box(low=self.min_steering_angle, high=self.max_steering_angle)
+        self.action_space = spaces.Box(
+            low=self.min_steering_angle,
+            high=self.max_steering_angle,
+            shape=(1,),  # Explicitly specify 1D action
+            dtype=np.float32
+        )
 
         # Track episode information
         self.episode_steps = 0
@@ -268,10 +273,8 @@ class Truck_trailer_Env_1(gym.Env):
             # Check if path is valid
             if not self.check_path_out_of_Map(start_x, start_y, start_psi2,
                                               goal_x, goal_y, goal_psi):
+                # If we find a valid path, return the poses and exit the loop
                 return (start_x, start_y, start_psi2, goal_x, goal_y, goal_psi)
-
-        # Return None if no valid poses found after max_attempts
-        return None
 
     def plot_vehicle(self, ax, x, y, heading, length, width, label, color='blue', show_wheels=True, steering_angle=0.0):
         """Plot vehicle visualization."""
@@ -388,6 +391,8 @@ class Truck_trailer_Env_1(gym.Env):
 
         return observation, {}
     def step(self, action):
+        if isinstance(action, np.ndarray):
+            action = action[0]
 
         # Clip and apply steering action
         action = np.clip(action, self.min_steering_angle, self.max_steering_angle)
@@ -415,13 +420,22 @@ class Truck_trailer_Env_1(gym.Env):
         self.out_of_map = self.check_out_of_Map(new_state[2], new_state[3], new_state[4], new_state[5])
         self.max_steps_reached = self.check_max_steps_reached(self.episode_steps)
 
-        done = self.jackknife or self.out_of_map or self.max_steps_reached
+        terminated = self.jackknife or self.out_of_map
+        truncated = self.max_steps_reached
 
         # compute reward
         reward_class = Rewardfunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
         total_reward, reward_dict = reward_class.compute_reward()
 
-        return observation, total_reward, done, reward_dict
+        #Check if goal is reached and mark as terminated
+        position_error = np.sqrt((self.state[4] - self.goalx) ** 2 + (self.state[5] - self.goaly) ** 2)
+        orientation_error = np.arctan2(observation[19], observation[20])
+        goal_reached = position_error <= self.position_threshold and abs(orientation_error) <= self.orientation_threshold
+
+        if goal_reached:
+            terminated = True
+
+        return observation, total_reward, terminated, truncated, reward_dict
 
     def render(self, mode='human'):
         """Render the environment."""
