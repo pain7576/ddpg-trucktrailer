@@ -1,0 +1,16 @@
+[project]
+name = "truck-trailer-ddpg"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cvxpy>=1.6.6",
+    "gym>=0.26.2",
+    "gymnasium>=1.2.0",
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.1",
+    "opencv-python>=4.11.0.86",
+    "scipy>=1.16.0",
+    "stable-baselines3[extra]>=1.2.0",
+]
