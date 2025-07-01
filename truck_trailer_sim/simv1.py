@@ -4,8 +4,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import numpy as np
 import matplotlib.pyplot as plt
-import gymnasium as gym
-from gymnasium import error, spaces
+import gym
+from gym import error, spaces
 import scipy.integrate as spi
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
@@ -420,22 +420,18 @@ class Truck_trailer_Env_1(gym.Env):
         self.out_of_map = self.check_out_of_Map(new_state[2], new_state[3], new_state[4], new_state[5])
         self.max_steps_reached = self.check_max_steps_reached(self.episode_steps)
 
-        terminated = self.jackknife or self.out_of_map
-        truncated = self.max_steps_reached
+        position_error = np.sqrt((self.state[4] - self.goalx) ** 2 + (self.state[5] - self.goaly) ** 2)
+        orientation_error = np.arctan2(observation[19], observation[20])
+        self.goal_reached = position_error <= self.position_threshold and abs(
+            orientation_error) <= self.orientation_threshold
+
+        done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached
 
         # compute reward
         reward_class = Rewardfunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
         total_reward, reward_dict = reward_class.compute_reward()
 
-        #Check if goal is reached and mark as terminated
-        position_error = np.sqrt((self.state[4] - self.goalx) ** 2 + (self.state[5] - self.goaly) ** 2)
-        orientation_error = np.arctan2(observation[19], observation[20])
-        goal_reached = position_error <= self.position_threshold and abs(orientation_error) <= self.orientation_threshold
-
-        if goal_reached:
-            terminated = True
-
-        return observation, total_reward, terminated, truncated, reward_dict
+        return observation, total_reward, done, reward_dict
 
     def render(self, mode='human'):
         """Render the environment."""

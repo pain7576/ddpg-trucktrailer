@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 import numpy as np
 
 from stable_baselines3 import DDPG
@@ -23,9 +23,9 @@ class SimulationCallback(BaseCallback):
                 done = False
                 total_reward = 0
 
-                while not (terminated or truncated):
+                while not done :
                     action, _ = self.model.predict(obs, deterministic=True)
-                    obs, reward, terminated, truncated, info = self.eval_env.step(action)
+                    obs, reward, done, info = self.eval_env.step(action)
                     total_reward += reward
                     self.eval_env.render()
 
