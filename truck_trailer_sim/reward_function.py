@@ -27,7 +27,7 @@ class Rewardfunction :
             'heading_error': self.alpha,
             'orientation_error': 1- self.alpha,
             'safety': -100.0,
-            'exploration': 1.0,
+            'exploration': 0.0,
             'success_bonus': 100
 
         }

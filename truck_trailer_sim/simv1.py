@@ -15,7 +15,7 @@ from matplotlib.patches import FancyArrow
 import time
 import random
 import math
-from reward_function import Rewardfunction
+from .reward_function import Rewardfunction
 
 class Truck_trailer_Env_1(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
