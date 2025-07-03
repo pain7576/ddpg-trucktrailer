@@ -4,14 +4,16 @@ import numpy as np
 from DDPG_agent import Agent
 from ploting_utils.plot_learning_curve import Plot_learning_curve
 from truck_trailer_sim.simv1 import Truck_trailer_Env_1
+from episode_replay_collector import EpisodeReplaySystem
 
 if __name__ == '__main__':
     env = Truck_trailer_Env_1()
+    replay_system = EpisodeReplaySystem(env)
     agent = Agent(alpha=0.0001, beta=0.001,
                     input_dims=env.observation_space.shape, tau=0.001,
                     batch_size=64, fc1_dims=400, fc2_dims=300,
                     n_actions=env.action_space.shape[0])
-    n_games = 7000
+    n_games = 100
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
                 str(agent.beta) + '_' + str(n_games) + '_games'
     figure_file = 'plots/' + filename + '.png'
@@ -23,17 +25,31 @@ if __name__ == '__main__':
         done = False
         score = 0
         agent.noise.reset()
+
+        episode_states = []
+        episode_actions = []
+
+        episode_states.append(env.state.copy()) # save initial state
         while not done:
             action = agent.choose_action(observation)
             # The actor output is in [-1, 1]. Scale it to the environment's action space.
             # The action space is symmetric, so we can just multiply by the high bound.
             # We also clip the action in case the noise pushes it outside the [-1, 1] range.
             scaled_action = np.clip(action, -1, 1) * env.action_space.high
+
+            episode_actions.append(scaled_action)  # save the actions
+
             observation_, reward, done, info = env.step(scaled_action)
+
+            episode_states.append(env.state.copy())  # save the resulting state
+
             agent.remember(observation, action, reward, observation_, done)
             agent.learn()
             score += reward
             observation = observation_
+
+        replay_system.save_episode(i, episode_states, episode_actions) #save the data of complete episode
+
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
