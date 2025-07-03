@@ -27,8 +27,8 @@ class Rewardfunction :
             'heading_error': self.alpha,
             'orientation_error': 1- self.alpha,
             'safety': -100.0,
-            'exploration': 0.0,
-            'success_bonus': 100
+            'exploration': 0.5,
+            'success_bonus': 1000
 
         }
     def check_jackknife(self) :
@@ -80,9 +80,9 @@ class Rewardfunction :
 
         return 1 if done else 0
 
-    def calculate_exploration_reward(self) :
-        self.exploration_reward_normalized = self.episode_steps / self.max_episode_steps
-        return self.exploration_reward_normalized
+    def calculate_penalty_over_exploration(self) :
+        self.exploration_penalty_normalized = -(self.episode_steps / self.max_episode_steps)
+        return self.exploration_penalty_normalized
 
     def compute_weights_heading_orientation(self) :
         self.alpha = np.exp(-self.observation[16])
@@ -101,14 +101,14 @@ class Rewardfunction :
         heading_error_reward = self.calculate_heading_error_reward()
         orientation_error_reward = self.calculate_orientation_error_reward()
         safety_reward = self.calculate_safety_reward()
-        exploration_reward = self.calculate_exploration_reward()
+        exploration_penalty = self.calculate_penalty_over_exploration()
         success_reward = self.calculate_success_reward()
 
         reward = position_error_reward * self.weights['postion_error'] + \
                  heading_error_reward * self.weights['heading_error'] + \
                  orientation_error_reward * self.weights['orientation_error'] + \
                  safety_reward * self.weights['safety'] + \
-                 exploration_reward * self.weights['exploration'] + \
+                 exploration_penalty * self.weights['exploration'] + \
                  success_reward * self.weights['success_bonus']
 
         reward_info = {
@@ -116,7 +116,7 @@ class Rewardfunction :
             'heading_error': heading_error_reward,
             'orientation_error': orientation_error_reward,
             'safety': safety_reward,
-            'exploration': exploration_reward,
+            'exploration': exploration_penalty,
             'success': success_reward
         }
 

@@ -11,7 +11,7 @@ if __name__ == '__main__':
                     input_dims=env.observation_space.shape, tau=0.001,
                     batch_size=64, fc1_dims=400, fc2_dims=300,
                     n_actions=env.action_space.shape[0])
-    n_games = 500
+    n_games = 7000
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
                 str(agent.beta) + '_' + str(n_games) + '_games'
     figure_file = 'plots/' + filename + '.png'
