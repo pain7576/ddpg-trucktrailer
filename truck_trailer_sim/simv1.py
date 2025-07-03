@@ -92,7 +92,7 @@ class Truck_trailer_Env_1(gym.Env):
 
         # Track episode information
         self.episode_steps = 0
-        self.max_episode_steps = 4500  # Maximum steps per episode
+        self.max_episode_steps = 300  # Maximum steps per episode
 
         #Tolerances to reach the goal
         self.position_threshold = 0.5

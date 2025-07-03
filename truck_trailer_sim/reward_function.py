@@ -18,7 +18,7 @@ class Rewardfunction :
         self.workspace_width = self.max_map_x - self.min_map_x
         self.workspace_height = self.max_map_y - self.min_map_y
         self.max_expected_distance = np.sqrt(self.workspace_width ** 2 + self.workspace_height ** 2)
-        self.max_episode_steps = 4500
+        self.max_episode_steps = 300
 
         self.compute_weights_heading_orientation()
 
