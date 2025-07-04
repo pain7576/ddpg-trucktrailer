@@ -15,7 +15,7 @@ from matplotlib.patches import FancyArrow
 import time
 import random
 import math
-from .reward_function import Rewardfunction
+from .reward_functionv1 import RewardFunction
 
 class Truck_trailer_Env_1(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
@@ -261,9 +261,14 @@ class Truck_trailer_Env_1(gym.Env):
             start_psi2 = random.uniform(self.min_heading_trailer, self.max_heading_trailer)
 
             # Generate random goal pose
-            goal_x = random.uniform(self.min_map_x, self.max_map_x)
-            goal_y = random.uniform(self.min_map_y, self.max_map_y)
-            goal_psi = random.uniform(self.min_heading_trailer, self.max_heading_trailer)
+
+            #goal_x = random.uniform(self.min_map_x, self.max_map_x)
+            #goal_y = random.uniform(self.min_map_y, self.max_map_y)
+            #goal_psi = random.uniform(self.min_heading_trailer, self.max_heading_trailer)
+
+            goal_x = 0
+            goal_y = -30
+            goal_psi = np.deg2rad(90)
 
             # Check if start and goal are at least 15 meters apart
             distance = ((goal_x - start_x) ** 2 + (goal_y - start_y) ** 2) ** 0.5
@@ -382,11 +387,10 @@ class Truck_trailer_Env_1(gym.Env):
                                                              self.goalyaw,
 
                                                             curvature=1.0 / 6)
-        # Set initial-state      0       1    2   3   4   5
+        # Set initial-state             0       1    2   3   4   5
         self.state = np.array([psi_1, psi_2, x1, y1, x2, y2], dtype=np.float32)
 
         observation = self.compute_observation(self.state, np.deg2rad(0))
-
         self.episode_steps = 0
 
         return observation, {}
@@ -428,7 +432,7 @@ class Truck_trailer_Env_1(gym.Env):
         done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached
 
         # compute reward
-        reward_class = Rewardfunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
+        reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
         total_reward, reward_dict = reward_class.compute_reward()
 
         return observation, total_reward, done, reward_dict
@@ -469,7 +473,7 @@ class Truck_trailer_Env_1(gym.Env):
         self.ax.set_aspect('equal')
 
         observation = self.compute_observation(self.state, self.steering_angle)
-        reward_class = Rewardfunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
+        reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
         total_reward, reward_dict = reward_class.compute_reward()
 
         info_text = (

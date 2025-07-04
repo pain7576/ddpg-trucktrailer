@@ -284,7 +284,7 @@ if __name__ == '__main__':
                       input_dims=env.observation_space.shape, tau=0.001,
                       batch_size=64, fc1_dims=400, fc2_dims=300,
                       n_actions=env.action_space.shape[0])
-        n_games = 200
+        n_games = 5000
 
     # ORIGINAL FILENAME GENERATION PRESERVED
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 
         # Check if this is a new best score
         is_best = avg_score > best_score
-        if is_best:
+        if is_best and i > 50:
             best_score = avg_score
             agent.save_models()
 
