@@ -38,8 +38,8 @@ class RewardFunction:
         self.weights = {
             'distance_exponential': 15.0,  # Strong pull toward goal
             'progress_reward': 8.0,  # Reward for getting closer
-            'Heading_alignment': 5.0,  # Reward for pointing correctly
-            'Orientation_alignment': 5.0, #Reward for pointing to correctly with goal pose
+            'Heading_alignment': 15.0,  # Reward for pointing correctly
+            'Orientation_alignment': 15.0, #Reward for pointing to correctly with goal pose
             'staged_success': [10, 25, 100],  # Progressive success bonuses
             'safety_major': -500.0,  # Reduced from -1000 to allow risk-taking
             'safety_minor': -50.0,  # Minor safety violations

@@ -1,0 +1,17 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from episode_replay_collectorv2 import EpisodeReplaySystem
+from truck_trailer_sim.simv2 import Truck_trailer_Env_2
+
+def main():
+    episode_number = input("Enter the episode number you want to see replay of: ")
+    reward = input("Enter the reward you got in that episode: ")
+    env = Truck_trailer_Env_2()
+    replay = EpisodeReplaySystem(env)
+    replay.replay_episode(episode_number,reward)
+
+if __name__ == "__main__":
+    main()
+
