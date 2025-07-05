@@ -7,9 +7,10 @@ from truck_trailer_sim.simv1 import Truck_trailer_Env_1
 
 def main():
     episode_number = input("Enter the episode number you want to see replay of: ")
+    reward = input("Enter the reward you got in that episode: ")
     env = Truck_trailer_Env_1()
     replay = EpisodeReplaySystem(env)
-    replay.replay_episode(episode_number)
+    replay.replay_episode(episode_number,reward)
 
 if __name__ == "__main__":
     main()

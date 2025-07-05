@@ -99,21 +99,24 @@ class RichCLI:
 
         self.console.print(config_table)
 
-    def display_episode_result(self, episode, score, avg_score, best_score, is_best=False):
+    def display_episode_result(self, episode, score, avg_score, best_score, success, is_best=False):
         """Display episode results with beautiful formatting"""
         if is_best:
             self.console.print(
-                f"🏆 [bold green]Episode {episode:4d}[/bold green] | "
-                f"Score: [yellow]{score:8.1f}[/yellow] | "
-                f"Avg: [cyan]{avg_score:8.1f}[/cyan] | "
-                f"Best: [green]{best_score:8.1f}[/green] [bold red]NEW BEST![/bold red]"
+                f"🏆[bold green]Episode {episode:4d}[/bold green] | "
+                f"Score:[yellow]{score:8.1f}[/yellow] | "
+                f"Avg:[cyan]{avg_score:8.1f}[/cyan] | "
+                f"goal:[green]{success}[/green] | "
+                f"Best:[green]{best_score:8.1f}[/green] [bold red]NEW BEST![/bold red]|"
+
             )
         else:
             self.console.print(
-                f"📈 [bold white]Episode {episode:4d}[/bold white] | "
-                f"Score: [yellow]{score:8.1f}[/yellow] | "
-                f"Avg: [cyan]{avg_score:8.1f}[/cyan] | "
-                f"Best: [green]{best_score:8.1f}[/green]"
+                f"📈[bold white]Episode {episode:4d}[/bold white] | "
+                f"Score:[yellow]{score:8.1f}[/yellow] | "
+                f"Avg:[cyan]{avg_score:8.1f}[/cyan] | "
+                f"goal:[green]{success}[/green] | "
+                f"Best:[green]{best_score:8.1f}[/green]"
             )
 
     def display_message(self, message, style="white"):
@@ -344,6 +347,7 @@ if __name__ == '__main__':
 
         episode_states = []
         episode_actions = []
+        episode_reward = []
 
         episode_states.append(env.state.copy())  # save initial state
 
@@ -372,6 +376,7 @@ if __name__ == '__main__':
             observation_, reward, done, info = env.step(scaled_action)
 
             episode_states.append(env.state.copy())  # save the resulting state
+            episode_reward.append(info.copy())
 
             agent.remember(observation, action, reward, observation_, done)
             agent.learn()
@@ -379,7 +384,7 @@ if __name__ == '__main__':
             observation = observation_
 
         # Save the data of complete episode with environment data
-        replay_system.save_episode(i, episode_states, episode_actions, env_data)
+        replay_system.save_episode(i, episode_states, episode_actions, episode_reward, env_data)
 
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
@@ -390,8 +395,12 @@ if __name__ == '__main__':
             best_score = avg_score
             agent.save_models()
 
+        if episode_reward[-1]['final_success_bonus'] > 0:
+            status = "SUCCESS"
+        else:
+            status = "FAILURE"
         # Enhanced display but original print logic preserved
-        cli.display_episode_result(i, score, avg_score, best_score, is_best)
+        cli.display_episode_result(i, score, avg_score, best_score, status, is_best)
 
         # ORIGINAL SAVE LOGIC PRESERVED
         if (i + 1) % 10 == 0:
