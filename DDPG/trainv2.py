@@ -11,6 +11,7 @@ from DDPG_agent import Agent
 from ploting_utils.plot_learning_curve import Plot_learning_curve
 from truck_trailer_sim.simv2 import Truck_trailer_Env_2
 from episode_replay_collector import EpisodeReplaySystem
+from collections import deque
 
 # Rich library imports
 from rich.console import Console
@@ -145,6 +146,18 @@ class RichCLI:
 # Initialize CLI - keeping this global for compatibility
 cli = RichCLI()
 
+def prompt_load_replaybuffer():
+    cli.display_message("🔄 Checkpoint Loading Options", "bold cyan")
+    load_checkpoint = input("Load replay buffer? (y/n): ").strip().lower()
+    if load_checkpoint == 'y':
+        return True
+    elif load_checkpoint == 'n':
+        return False
+    else:
+        cli.display_warning("Invalid input. Defaulting to 'n'.")
+        return False
+
+
 
 def prompt_load_checkpoint():
     """Original function with rich enhancement"""
@@ -205,6 +218,48 @@ def load_training_state(filename):
         cli.display_warning(f"No training state found at {state_file}")
         return None
 
+def list_replay_buffer():
+    """List available training state files and return the selected one - ORIGINAL LOGIC PRESERVED"""
+    training_dir = 'replay_buffer'
+    if not os.path.exists(training_dir):
+        cli.display_error("No replay_buffer directory found.")
+        return None
+
+    files = [f for f in os.listdir(training_dir) if f.endswith('_replay_buffer.pkl')]
+    if not files:
+        cli.display_error("No training state files found.")
+        return None
+
+    cli.display_message("💾 Available Replay Buffer", "bold cyan")
+
+    # Create a table for training states
+    state_table = Table(title="Replay Buffer", box=box.ROUNDED)
+    state_table.add_column("ID", style="cyan", no_wrap=True)
+    state_table.add_column("Replay Buffer", style="white")
+    state_table.add_column("File Size", style="yellow")
+
+    for i, file in enumerate(files, 1):
+        base_name = file.replace('_replay_buffer.pkl', '')
+        file_path = os.path.join(training_dir, file)
+        file_size = os.path.getsize(file_path)
+        size_str = f"{file_size / 1024:.1f} KB"
+        state_table.add_row(str(i), base_name, size_str)
+
+    console.print(state_table)
+
+    try:
+        choice = int(input("Select a training state by number: "))
+        if 1 <= choice <= len(files):
+            # Return just the base name without the suffix
+            selected = files[choice - 1].replace('_replay_buffer.pkl', '')
+            cli.display_success(f"Selected: {selected}")
+            return selected
+        else:
+            cli.display_error("Invalid selection.")
+            return None
+    except ValueError:
+        cli.display_error("Invalid input. Please enter a number.")
+        return None
 
 def list_training_states():
     """List available training state files and return the selected one - ORIGINAL LOGIC PRESERVED"""
@@ -250,6 +305,26 @@ def list_training_states():
         return None
 
 
+def save_transitions(episode_num, transitions_history):
+    """Save transition history from last 200 episodes"""
+    os.makedirs('replay_buffer', exist_ok=True)
+    filename = f"replay_buffer/transitions_episode_{episode_num}_replay_buffer.pkl"
+    with open(filename, 'wb') as f:
+        pickle.dump(list(transitions_history), f)
+    print(f"Saved transitions for last {len(transitions_history)} episodes to {filename}")
+
+def load_transitions(filename):
+    """Load transition history from file"""
+    replay_file = f'replay_buffer/{filename}_replay_buffer.pkl'
+    if os.path.exists(replay_file):
+        with open(replay_file, 'rb') as f:
+            transitions = pickle.load(f)
+        print(f"Loaded {len(transitions)} episodes of transitions from {replay_file}")
+        return transitions
+    else:
+        print(f"No transitions file found at {replay_file}")
+        return None
+
 if __name__ == '__main__':
     # Display banner
     cli.display_banner()
@@ -260,6 +335,12 @@ if __name__ == '__main__':
         cli.display_info("Loading checkpoint...")
     else:
         cli.display_info("Starting fresh...")
+
+    should_load_replaybuffer = prompt_load_replaybuffer()
+    if should_load_replaybuffer:
+        cli.display_info("Loading Replay Buffer...")
+    else:
+        cli.display_info("Starting fresh ono reply buffer (empty)...")
 
     env = Truck_trailer_Env_2()
     replay_system = EpisodeReplaySystem(env)
@@ -289,7 +370,7 @@ if __name__ == '__main__':
                       input_dims=env.observation_space.shape, tau=0.001,
                       batch_size=64, fc1_dims=400, fc2_dims=300,
                       n_actions=env.action_space.shape[0])
-        n_games = 5000
+        n_games = 125
 
     # ORIGINAL FILENAME GENERATION PRESERVED
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
@@ -327,6 +408,19 @@ if __name__ == '__main__':
             cli.display_warning("Starting new fresh training run...")
             resume_episode = 0
 
+    if should_load_replaybuffer:
+        load_filename = list_replay_buffer()
+        stored_transitions = load_transitions(load_filename)
+        if stored_transitions:
+            cli.display_info(f"Loading transitions")
+            for episode_transitions in stored_transitions:
+                for transition in episode_transitions:
+                    obs, action, reward, obs_next, done = transition
+                    agent.remember(obs, action, reward, obs_next, done)
+            cli.display_success(f"Loaded {agent.memory.mem_cntr} transitions into replay buffer")
+        else:
+            cli.display_warning("No stored transition files found")
+
     # ORIGINAL EPISODE CALCULATION PRESERVED
     if should_load:
         # Total episodes to train = resume point + additional episodes
@@ -340,6 +434,7 @@ if __name__ == '__main__':
     # Enhanced training loop with progress tracking
     cli.display_message(f"🎯 Starting Training: Episodes {start_episode} to {end_episode - 1}", "bold cyan")
 
+    episode_transitions_history = deque(maxlen=200)
     # ORIGINAL TRAINING LOOP LOGIC COMPLETELY PRESERVED
     for i in range(start_episode, end_episode):
         observation, info = env.reset()
@@ -350,6 +445,7 @@ if __name__ == '__main__':
         episode_states = []
         episode_actions = []
         episode_reward = []
+        episode_transitions = []
 
         episode_states.append(env.state.copy())  # save initial state
 
@@ -378,9 +474,13 @@ if __name__ == '__main__':
             episode_reward.append(info.copy())
 
             agent.remember(observation, action, reward, observation_, done)
+            transition = (observation.copy(), action.copy(), reward, observation_.copy(), done)
+            episode_transitions.append(transition)
             agent.learn()
             score += reward
             observation = observation_
+
+        episode_transitions_history.append(episode_transitions)
 
         # Save the data of complete episode with environment data
         replay_system.save_episode(i, episode_states, episode_actions, episode_reward, env_data)
@@ -411,6 +511,7 @@ if __name__ == '__main__':
         # Check if this is a new best score
         if is_best:
             agent.save_models()
+            save_transitions(i, episode_transitions_history)
             best_success_rate = success_rate
             best_score = avg_score
 
