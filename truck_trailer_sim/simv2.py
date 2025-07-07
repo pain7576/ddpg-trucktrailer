@@ -97,6 +97,8 @@ class Truck_trailer_Env_2(gym.Env):
         self.position_threshold = 0.5
         self.orientation_threshold = np.deg2rad(15)
 
+        self.reward_state = None
+
     def compute_observation(self, state, steering_angle):
         """Compute the enhanced observation vector from the current state."""
         # Extract state components
@@ -235,34 +237,49 @@ class Truck_trailer_Env_2(gym.Env):
         )
         return out_of_bounds_truck or out_of_bounds_trailer
 
-    def check_path_out_of_Map(self, start_x, start_y, start_psi, goal_x, goal_y, goal_psi):
-        """Check if Dubins path is within map bounds."""
-        path_x, path_y, path_yaw = plan_dubins_path_backward(start_x,
-                                                             start_y,
-                                                             start_psi,
-                                                             goal_x,
-                                                             goal_y,
-                                                             goal_psi,
-                                                             curvature=1.0 / 6)
-
-        for x, y in zip(path_x, path_y):
-            if (x < self.min_map_x or x > self.max_map_x or
-                    y < self.min_map_y or y > self.max_map_y):
-                return True
-        return False
-
     def generate_valid_random_poses(self, max_attempts=1000):
         """Generate random start and goal poses."""
         for attempt in range(max_attempts):
             start_x = 0
             start_y = -20
-            start_psi2 = np.deg2rad(90)
+            start_psi2 = np.random.uniform(np.deg2rad(45), np.deg2rad(120))
 
             goal_x = 0
             goal_y = -30
             goal_psi = np.deg2rad(90)
 
             return (start_x, start_y, start_psi2, goal_x, goal_y, goal_psi)
+
+    def check_if_past_goal(self, goal_y, trailer_y):
+        if goal_y > trailer_y:
+            return True
+        else:
+            return False
+
+    def _compute_reward_with_state(self, observation, state):
+        """Helper method to handle reward state properly"""
+        if self.reward_state is None:
+            # First step - no previous state
+            reward_function = RewardFunction(
+                observation, state, self.episode_steps,
+                self.position_threshold, self.orientation_threshold,
+                self.goalx, self.goaly, self.startx, self.starty
+            )
+        else:
+            # Subsequent steps - pass previous state
+            reward_function = RewardFunction(
+                observation, state, self.episode_steps,
+                self.position_threshold, self.orientation_threshold,
+                self.goalx, self.goaly, self.startx, self.starty,
+                previous_distance=self.reward_state['previous_distance'],
+                cumulative_backward_movement=self.reward_state['cumulative_backward_movement'],
+                step_count_for_backward_tracking=self.reward_state['step_count_for_backward_tracking'],
+                distance_history=self.reward_state['distance_history']
+            )
+
+        reward, reward_info = reward_function.compute_reward()
+        self.reward_state = reward_function.get_persistent_state()
+        return reward, reward_info
 
     def plot_vehicle(self, ax, x, y, heading, length, width, label, color='blue', show_wheels=True, steering_angle=0.0):
         """Plot vehicle visualization."""
@@ -367,6 +384,8 @@ class Truck_trailer_Env_2(gym.Env):
         observation = self.compute_observation(self.state, np.deg2rad(0))
         self.episode_steps = 0
 
+        self.reward_state = None
+
         return observation, {}
     def step(self, action):
         if isinstance(action, np.ndarray):
@@ -397,17 +416,17 @@ class Truck_trailer_Env_2(gym.Env):
         self.jackknife = self.check_jackknife(new_state[0], new_state[1])
         self.out_of_map = self.check_out_of_Map(new_state[2], new_state[3], new_state[4], new_state[5])
         self.max_steps_reached = self.check_max_steps_reached(self.episode_steps)
+        self.goal_passed = self.check_if_past_goal(self.goaly, self.state[5])
 
         position_error = np.sqrt((self.state[4] - self.goalx) ** 2 + (self.state[5] - self.goaly) ** 2)
         orientation_error = np.arctan2(observation[19], observation[20])
         self.goal_reached = position_error <= self.position_threshold and abs(
             orientation_error) <= self.orientation_threshold
 
-        done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached
+        done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached or self.goal_passed
 
         # compute reward
-        reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
-        total_reward, reward_dict = reward_class.compute_reward()
+        total_reward, reward_dict = self._compute_reward_with_state(observation, self.state)
 
         return observation, total_reward, done, reward_dict
 
@@ -446,15 +465,15 @@ class Truck_trailer_Env_2(gym.Env):
         self.ax.set_aspect('equal')
 
         observation = self.compute_observation(self.state, self.steering_angle)
-        reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
-        total_reward, reward_dict = reward_class.compute_reward()
+        #reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
+        #total_reward, reward_dict = reward_class.compute_reward()
 
         info_text = (
             f"Truck: x={x1:.1f}, y={y1:.1f}, ψ={np.rad2deg(psi1):.0f}°, δ={np.rad2deg(delta):.0f}°\n"
             f"Trailer: x={x2:.1f}, y={y2:.1f}, ψ={np.rad2deg(psi2):.0f}°\n"
             f"Start: x={self.startx:.1f}, y={self.starty:.1f}, θ={np.rad2deg(self.startyaw):.0f}°\n"
             f"Goal: x={self.goalx:.1f}, y={self.goaly:.1f}, θ={np.rad2deg(self.goalyaw):.0f}°\n"
-            f"Reward: {total_reward:.2f}\n"
+            #f"Reward: {total_reward:.2f}\n"
 
         )
         self.ax.text(2.5, 21.0, info_text, fontsize=6, fontweight='bold', va='top', ha='left',

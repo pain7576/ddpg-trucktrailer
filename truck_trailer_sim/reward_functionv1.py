@@ -2,7 +2,9 @@ import numpy as np
 
 
 class RewardFunction:
-    def __init__(self, observation, state, episode_steps, position_threshold, orientation_threshold, goalx, goaly):
+    def __init__(self, observation, state, episode_steps, position_threshold, orientation_threshold, goalx, goaly, startx, starty,
+                 previous_distance=None, cumulative_backward_movement=None, step_count_for_backward_tracking=None,
+                 distance_history=None):
         self.observation = observation
         self.state = state
         self.episode_steps = episode_steps
@@ -10,6 +12,8 @@ class RewardFunction:
         self.orientation_threshold = orientation_threshold
         self.goalx = goalx
         self.goaly = goaly
+        self.startx = startx
+        self.starty = starty
 
         # Environment boundaries
         self.min_map_x = -40
@@ -25,8 +29,29 @@ class RewardFunction:
 
         # Initialize previous distance tracking for progress calculation
         # This is crucial for rewarding improvement rather than just proximity
-        if not hasattr(self, 'previous_distance'):
-            self.previous_distance = self._calculate_raw_distance()
+        current_distance = self._calculate_raw_distance()
+        self.initial_distance_to_goal = np.sqrt(
+            (self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2) + 1e-6
+
+        if previous_distance is not None:
+            self.previous_distance = previous_distance
+        else:
+            self.previous_distance = current_distance  # First step of episode
+
+        if cumulative_backward_movement is not None:
+            self.cumulative_backward_movement = cumulative_backward_movement
+        else:
+            self.cumulative_backward_movement = 0.0
+
+        if step_count_for_backward_tracking is not None:
+            self.step_count_for_backward_tracking = step_count_for_backward_tracking
+        else:
+            self.step_count_for_backward_tracking = 0
+
+        if distance_history is not None:
+            self.distance_history = distance_history.copy()
+        else:
+            self.distance_history = [current_distance] * 5
 
         # Mathematical parameters for reward shaping
         self.distance_decay_rate = 2.0  # β parameter for exponential distance reward
@@ -46,6 +71,15 @@ class RewardFunction:
             'exploration_bonus': 2.0,  # Positive exploration encouragement
             'backward_movement': 1.0,  # Weight for anti-circling penalty
             'final_success': 200.0  # Big bonus for complete success
+        }
+
+    def get_persistent_state(self):
+        """Return the state that needs to be passed to the next step"""
+        return {
+            'previous_distance': self.previous_distance,
+            'cumulative_backward_movement': self.cumulative_backward_movement,
+            'step_count_for_backward_tracking': self.step_count_for_backward_tracking,
+            'distance_history': self.distance_history.copy()
         }
 
     def _calculate_raw_distance(self):
@@ -95,9 +129,6 @@ class RewardFunction:
             progress_component = np.tanh(instant_progress / self.progress_scale) * 0.5  # Half penalty
 
         # SOLUTION 2: Net progress tracking over multiple steps
-        # Track progress over last N steps to prevent short-term cycling
-        if not hasattr(self, 'distance_history'):
-            self.distance_history = [current_distance] * 5  # Initialize with current distance
 
         # Update distance history (rolling window)
         self.distance_history.append(current_distance)
@@ -120,8 +151,6 @@ class RewardFunction:
         # Combine all progress components
         total_progress_reward = progress_component + net_progress_reward + efficiency_bonus
 
-        # Update previous distance for next step
-        self.previous_distance = current_distance
 
         return total_progress_reward
 
@@ -140,84 +169,78 @@ class RewardFunction:
         truck is just the actuator mechanism.
         """
         current_distance = self._calculate_raw_distance()
-        normalized_distance = self._normalize_distance(current_distance)
+        journey_progress = np.clip(
+            (self.initial_distance_to_goal - current_distance) / self.initial_distance_to_goal,
+            0.0, 1.0
+        )
 
         # Create a smooth transition function using sigmoidal curves
         # When normalized_distance = 1.0 (far), trailer_heading_priority ≈ 1.0
         # When normalized_distance = 0.0 (close), trailer_heading_priority ≈ 0.0
-        distance_factor = normalized_distance
+        sharpness = 7.0
 
         # Trailer heading priority: High when far, low when close
         # During approach, we want trailer pointing toward goal
-        trailer_heading_priority = np.exp(-3.0 * (1.0 - distance_factor))
+        transition_val = np.tanh(sharpness * (journey_progress - 0.5))
 
         # Trailer final orientation priority: Low when far, high when close
         # During docking, we want trailer matching goal pose orientation
-        trailer_final_orientation_priority = np.exp(-3.0 * distance_factor)
+        trailer_final_orientation_priority = (transition_val + 1) / 2.0
 
         # Distance priority: Always important but peaks at medium distances
         # Uses a bell curve to emphasize consistent progress
-        distance_priority = 1.0 + 0.5 * np.exp(-8.0 * (distance_factor - 0.5) ** 2)
+        trailer_heading_priority = 1.0 - trailer_final_orientation_priority
 
         # Progress priority: Consistent throughout but slightly higher when close
         # Encourages steady movement with extra emphasis on final approach
-        progress_priority = 1.0 + 0.3 * (1.0 - distance_factor)
+        distance_priority = 1.0
+        progress_priority = 1.0
 
         return {
             'trailer_heading': trailer_heading_priority,
             'trailer_final_orientation': trailer_final_orientation_priority,
             'distance': distance_priority,
             'progress': progress_priority,
-            'current_distance': current_distance,
-            'normalized_distance': normalized_distance
+            'journey_progress': journey_progress, # Return for debugging
+            'current_distance': current_distance
         }
 
     def calculate_backward_movement_penalty(self):
         """
-        Penalize excessive backward movement using cumulative tracking.
-
-        Educational insight: This demonstrates elegant simplicity in reward design.
-        Instead of complex pattern detection, we use a simple "movement budget"
-        approach that allows tactical retreats while preventing exploitation.
-
-        Mathematical framework: We track cumulative backward movement and apply
-        penalties once it exceeds a reasonable threshold for legitimate maneuvering.
+        Fixed version that works with new object creation every step
         """
         current_distance = self._calculate_raw_distance()
 
-        # Initialize tracking variables if they don't exist
-        if not hasattr(self, 'cumulative_backward_movement'):
-            self.cumulative_backward_movement = 0.0
-            self.step_count_for_backward_tracking = 0
+        # ✅ DEBUG: Print to verify it's working
+        #print(f"Step {self.episode_steps}: current={current_distance:.3f}, previous={self.previous_distance:.3f}")
 
         # Calculate backward movement for this step
         backward_movement_this_step = max(0, current_distance - self.previous_distance)
+        #print(f"  Backward movement this step: {backward_movement_this_step:.3f}")
 
         # Accumulate backward movement
         self.cumulative_backward_movement += backward_movement_this_step
         self.step_count_for_backward_tracking += 1
 
-        # Define the "movement budget" - how much backward movement is acceptable
-        # This represents legitimate tactical maneuvering
-        # We scale this with episode length to be more generous early in learning
-        base_budget = 5.0  # meters of backward movement allowed
-        time_factor = min(1.0, self.step_count_for_backward_tracking / 50)  # Ramp up over 50 steps
+        #print(f"  Cumulative backward: {self.cumulative_backward_movement:.3f}")
+
+        # Define the "movement budget"
+        base_budget = 5.0
+        time_factor = min(1.0, self.step_count_for_backward_tracking / 50)
         movement_budget = base_budget * time_factor
 
         # Calculate penalty based on excess backward movement
         excess_backward_movement = max(0, self.cumulative_backward_movement - movement_budget)
 
         # Apply escalating penalty function
-        # Mathematical insight: We use a quadratic penalty to make excessive
-        # backward movement increasingly costly
         if excess_backward_movement > 0:
-            # Quadratic penalty - gets more severe as excess increases
             penalty_magnitude = (excess_backward_movement ** 1.5) * 0.5
             backward_penalty = -penalty_magnitude
+            #print(f"  🚨 PENALTY ACTIVATED: {backward_penalty:.3f}")
         else:
             backward_penalty = 0
+            #print(f"  ✅ No penalty")
 
-        # Optional: Provide some feedback about the penalty for debugging
         penalty_info = {
             'cumulative_backward': self.cumulative_backward_movement,
             'movement_budget': movement_budget,
@@ -336,6 +359,10 @@ class RewardFunction:
             safety_penalty += self.weights['safety_minor']
             violation_type = "minor_boundary"
 
+        if self.goaly > trailer_y:
+            safety_penalty += self.weights['safety_major']
+            violation_type = "past_the_goal"
+
         return safety_penalty, violation_type
 
     def calculate_exploration_bonus(self):
@@ -411,6 +438,7 @@ class RewardFunction:
 
         # Final success bonus
         final_success_bonus = self.weights['final_success'] if success else 0
+        self.previous_distance = self._calculate_raw_distance()
 
         # Combine all components with their weights
         total_reward = (
