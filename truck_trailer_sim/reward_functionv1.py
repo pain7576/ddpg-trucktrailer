@@ -4,7 +4,7 @@ import numpy as np
 class RewardFunction:
     def __init__(self, observation, state, episode_steps, position_threshold, orientation_threshold, goalx, goaly, startx, starty,
                  previous_distance=None, cumulative_backward_movement=None, step_count_for_backward_tracking=None,
-                 distance_history=None):
+                 distance_history=None, stages_achieved=None, closest_distance_to_goal=None):
         self.observation = observation
         self.state = state
         self.episode_steps = episode_steps
@@ -25,7 +25,7 @@ class RewardFunction:
         self.workspace_width = self.max_map_x - self.min_map_x
         self.workspace_height = self.max_map_y - self.min_map_y
         self.max_expected_distance = np.sqrt(self.workspace_width ** 2 + self.workspace_height ** 2)
-        self.max_episode_steps = 300
+        self.max_episode_steps = 110
 
         # Initialize previous distance tracking for progress calculation
         # This is crucial for rewarding improvement rather than just proximity
@@ -53,6 +53,19 @@ class RewardFunction:
         else:
             self.distance_history = [current_distance] * 5
 
+        if 'stages_achieved' in locals() and stages_achieved is not None:
+            self.stages_achieved = stages_achieved.copy()
+        else:
+            self.stages_achieved = [False, False, False]
+
+        if closest_distance_to_goal is not None:
+            self.closest_distance_to_goal = closest_distance_to_goal
+            # Update closest distance if current is closer
+            if current_distance < self.closest_distance_to_goal:
+                self.closest_distance_to_goal = current_distance
+        else:
+            self.closest_distance_to_goal = current_distance
+
         # Mathematical parameters for reward shaping
         self.distance_decay_rate = 2.0  # β parameter for exponential distance reward
         self.progress_scale = 1.0  # Scaling factor for progress normalization
@@ -61,8 +74,8 @@ class RewardFunction:
         # Set up reward weights with proper hierarchy
         # Notice how goal-seeking rewards are now competitive with safety penalties
         self.weights = {
-            'distance_exponential': 15.0,  # Strong pull toward goal
-            'progress_reward': 8.0,  # Reward for getting closer
+            'distance_exponential': 0,  # Strong pull toward goal
+            'progress_reward': 15.0,  # Reward for getting closer
             'Heading_alignment': 15.0,  # Reward for pointing correctly
             'Orientation_alignment': 15.0, #Reward for pointing to correctly with goal pose
             'staged_success': [10, 25, 100],  # Progressive success bonuses
@@ -79,7 +92,9 @@ class RewardFunction:
             'previous_distance': self.previous_distance,
             'cumulative_backward_movement': self.cumulative_backward_movement,
             'step_count_for_backward_tracking': self.step_count_for_backward_tracking,
-            'distance_history': self.distance_history.copy()
+            'distance_history': self.distance_history.copy(),
+            'stages_achieved': self.stages_achieved.copy(),
+            'closest_distance_to_goal': self.closest_distance_to_goal
         }
 
     def _calculate_raw_distance(self):
@@ -90,6 +105,12 @@ class RewardFunction:
     def _normalize_distance(self, distance):
         """Normalize distance to [0, 1] range for consistent reward scaling."""
         return min(distance / self.max_expected_distance, 1.0)
+
+    def check_excessive_backward_movement(self):
+        """Check if trailer has moved too far away from goal."""
+        current_distance = self._calculate_raw_distance()
+        max_allowed_distance = self.closest_distance_to_goal + 6.0
+        return current_distance > max_allowed_distance
 
     def calculate_exponential_distance_reward(self):
         """
@@ -181,7 +202,7 @@ class RewardFunction:
 
         # Trailer heading priority: High when far, low when close
         # During approach, we want trailer pointing toward goal
-        transition_val = np.tanh(sharpness * (journey_progress - 0.5))
+        transition_val = np.tanh(sharpness * (journey_progress - 0.3))
 
         # Trailer final orientation priority: Low when far, high when close
         # During docking, we want trailer matching goal pose orientation
@@ -307,15 +328,18 @@ class RewardFunction:
         # Stage 1: Getting close (within 5 meters)
         if current_distance <= 5.0:
             staged_rewards += self.weights['staged_success'][0]
+            self.stages_achieved[0] = True
 
         # Stage 2: Very close with decent orientation (within 2 meters, roughly aligned)
-        if current_distance <= 2.0 and current_orientation_error <= np.deg2rad(45):
+        if (current_distance <= 2.0 and current_orientation_error <= np.deg2rad(45) and not self.stages_achieved[1]):
             staged_rewards += self.weights['staged_success'][1]
+            self.stages_achieved[1] = True
 
         # Stage 3: Final docking position
         if (current_distance <= self.position_threshold and
-                current_orientation_error <= self.orientation_threshold):
+                current_orientation_error <= self.orientation_threshold and not self.stages_achieved[2]):
             staged_rewards += self.weights['staged_success'][2]
+            self.stages_achieved[2] = True
 
         return staged_rewards
 
@@ -362,6 +386,10 @@ class RewardFunction:
         if self.goaly > trailer_y:
             safety_penalty += self.weights['safety_major']
             violation_type = "past_the_goal"
+
+        if self.episode_steps >= self.max_episode_steps:
+            safety_penalty += self.weights['safety_major']
+            violation_type = "max_step"
 
         return safety_penalty, violation_type
 

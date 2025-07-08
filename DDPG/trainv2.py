@@ -370,7 +370,7 @@ if __name__ == '__main__':
                       input_dims=env.observation_space.shape, tau=0.001,
                       batch_size=64, fc1_dims=400, fc2_dims=300,
                       n_actions=env.action_space.shape[0])
-        n_games = 125
+        n_games = 5000
 
     # ORIGINAL FILENAME GENERATION PRESERVED
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
@@ -503,7 +503,7 @@ if __name__ == '__main__':
 
         is_better_success = success_rate > best_success_rate
         is_equal_success_better_score = success_rate == best_success_rate and avg_score > best_score
-        is_best = (is_better_success or is_equal_success_better_score) and i > 50
+        is_best = (is_better_success or is_equal_success_better_score) and i > (start_episode + 100)
 
 
 
@@ -511,6 +511,7 @@ if __name__ == '__main__':
         # Check if this is a new best score
         if is_best:
             agent.save_models()
+            save_training_state(i + 1, score_history, best_score, filename)
             save_transitions(i, episode_transitions_history)
             best_success_rate = success_rate
             best_score = avg_score
@@ -519,9 +520,6 @@ if __name__ == '__main__':
         # Enhanced display but original print logic preserved
         cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, is_best)
 
-        # ORIGINAL SAVE LOGIC PRESERVED
-        if (i + 1) % 10 == 0:
-            save_training_state(i + 1, score_history, best_score, filename)
 
     # ORIGINAL PLOT GENERATION PRESERVED
     x = [i + 1 for i in range(end_episode)]

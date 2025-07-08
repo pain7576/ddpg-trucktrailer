@@ -30,8 +30,8 @@ class Truck_trailer_Env_2(gym.Env):
         self.max_map_orientation = np.radians(360)
 
         self.steering_angle = 0
-        self.L1 = 5.74  # wheelbase of truck
-        self.L2 = 10.192  # length of trailer
+        self.L1 = 5  # wheelbase of truck
+        self.L2 = 7  # length of trailer
         self.hitch_offset = 0.00  # hitch offset from truck's rear axle
         self.v1x = -5.012  # longitudinal velocity of the truck (negative for backing)
         self.u = 0.0
@@ -91,7 +91,7 @@ class Truck_trailer_Env_2(gym.Env):
 
         # Track episode information
         self.episode_steps = 0
-        self.max_episode_steps = 300  # Maximum steps per episode
+        self.max_episode_steps = 110  # Maximum steps per episode
 
         #Tolerances to reach the goal
         self.position_threshold = 0.5
@@ -241,7 +241,7 @@ class Truck_trailer_Env_2(gym.Env):
         """Generate random start and goal poses."""
         for attempt in range(max_attempts):
             start_x = 0
-            start_y = -20
+            start_y = 10
             start_psi2 = np.random.uniform(np.deg2rad(45), np.deg2rad(120))
 
             goal_x = 0
@@ -274,12 +274,14 @@ class Truck_trailer_Env_2(gym.Env):
                 previous_distance=self.reward_state['previous_distance'],
                 cumulative_backward_movement=self.reward_state['cumulative_backward_movement'],
                 step_count_for_backward_tracking=self.reward_state['step_count_for_backward_tracking'],
-                distance_history=self.reward_state['distance_history']
+                distance_history=self.reward_state['distance_history'],
+                stages_achieved = self.reward_state['stages_achieved'],
+                closest_distance_to_goal=self.reward_state['closest_distance_to_goal']
             )
 
         reward, reward_info = reward_function.compute_reward()
         self.reward_state = reward_function.get_persistent_state()
-        return reward, reward_info
+        return reward, reward_info, reward_function.check_excessive_backward_movement()
 
     def plot_vehicle(self, ax, x, y, heading, length, width, label, color='blue', show_wheels=True, steering_angle=0.0):
         """Plot vehicle visualization."""
@@ -423,10 +425,11 @@ class Truck_trailer_Env_2(gym.Env):
         self.goal_reached = position_error <= self.position_threshold and abs(
             orientation_error) <= self.orientation_threshold
 
-        done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached or self.goal_passed
+        total_reward, reward_dict, excessive_backward = self._compute_reward_with_state(observation, self.state)
 
-        # compute reward
-        total_reward, reward_dict = self._compute_reward_with_state(observation, self.state)
+        done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached or self.goal_passed or excessive_backward
+
+
 
         return observation, total_reward, done, reward_dict
 
