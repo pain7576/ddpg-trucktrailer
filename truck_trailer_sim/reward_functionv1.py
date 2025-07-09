@@ -1,10 +1,11 @@
 import numpy as np
+from sympy.ntheory.factor_ import smoothness
 
 
 class RewardFunction:
     def __init__(self, observation, state, episode_steps, position_threshold, orientation_threshold, goalx, goaly, startx, starty,
                  previous_distance=None, cumulative_backward_movement=None, step_count_for_backward_tracking=None,
-                 distance_history=None, stages_achieved=None, closest_distance_to_goal=None):
+                 distance_history=None, stages_achieved=None, closest_distance_to_goal=None, previous_steering=None):
         self.observation = observation
         self.state = state
         self.episode_steps = episode_steps
@@ -33,10 +34,18 @@ class RewardFunction:
         self.initial_distance_to_goal = np.sqrt(
             (self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2) + 1e-6
 
+        current_steering = np.arctan2(self.observation[10],self.observation[11])
+
+
         if previous_distance is not None:
             self.previous_distance = previous_distance
         else:
             self.previous_distance = current_distance  # First step of episode
+
+        if previous_steering is not None:
+            self.previous_steering = previous_steering
+        else :
+            self.previous_steering = current_steering
 
         if cumulative_backward_movement is not None:
             self.cumulative_backward_movement = cumulative_backward_movement
@@ -78,6 +87,7 @@ class RewardFunction:
             'progress_reward': 15.0,  # Reward for getting closer
             'Heading_alignment': 15.0,  # Reward for pointing correctly
             'Orientation_alignment': 15.0, #Reward for pointing to correctly with goal pose
+            'smoothness_penalty': -10.0,   # penalty for jerky steering movements
             'staged_success': [10, 25, 100],  # Progressive success bonuses
             'safety_major': -500.0,  # Reduced from -1000 to allow risk-taking
             'safety_minor': -50.0,  # Minor safety violations
@@ -94,7 +104,8 @@ class RewardFunction:
             'step_count_for_backward_tracking': self.step_count_for_backward_tracking,
             'distance_history': self.distance_history.copy(),
             'stages_achieved': self.stages_achieved.copy(),
-            'closest_distance_to_goal': self.closest_distance_to_goal
+            'closest_distance_to_goal': self.closest_distance_to_goal,
+            'previous_steering': self.previous_steering
         }
 
     def _calculate_raw_distance(self):
@@ -312,6 +323,18 @@ class RewardFunction:
 
         return trailer_goal_alignment
 
+    def calculate_steering_smoothness_penalty(self):
+
+        current_steering = np.arctan2(self.observation[10],self.observation[11])
+        steering_change = current_steering - self.previous_steering
+
+        normalized_steering_change = abs(steering_change) / np.deg2rad(90)
+
+        smoothness_penalty = normalized_steering_change
+
+        return smoothness_penalty
+
+
     def calculate_staged_success_rewards(self):
         """
         Multi-level success criteria that provide frequent positive feedback.
@@ -460,6 +483,7 @@ class RewardFunction:
         safety_penalty, violation_type = self.calculate_safety_penalties()
         exploration_bonus = self.calculate_exploration_bonus()
         backward_penalty, backward_info = self.calculate_backward_movement_penalty()
+        smoothness_penalty = self.calculate_steering_smoothness_penalty()
 
         # Check termination conditions
         done, success, jackknife, out_of_bounds, max_steps = self.check_episode_termination()
@@ -478,6 +502,7 @@ class RewardFunction:
                 safety_penalty +  # Already weighted
                 exploration_bonus +  # Already weighted
                 (backward_penalty * self.weights['backward_movement']) +
+                (smoothness_penalty * self.weights['smoothness_penalty']) +
                 final_success_bonus
         )
 
@@ -494,6 +519,7 @@ class RewardFunction:
             'final_success_bonus': final_success_bonus,
             'violation_type': violation_type,
             'backward_penalty' : backward_penalty * self.weights['backward_movement'],
+            'smoothness_penalty' : smoothness_penalty * self.weights['smoothness_penalty'],
             'backward_movement_info': backward_info,
             'done': done,
             'success': success

@@ -277,7 +277,8 @@ class Truck_trailer_Env_2(gym.Env):
                 step_count_for_backward_tracking=self.reward_state['step_count_for_backward_tracking'],
                 distance_history=self.reward_state['distance_history'],
                 stages_achieved = self.reward_state['stages_achieved'],
-                closest_distance_to_goal=self.reward_state['closest_distance_to_goal']
+                closest_distance_to_goal=self.reward_state['closest_distance_to_goal'],
+                previous_steering=self.reward_state['previous_steering'],
             )
 
         reward, reward_info = reward_function.compute_reward()
