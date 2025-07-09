@@ -40,7 +40,8 @@ class EpisodeReplaySystem:
             'Safety\nPenalty',
             'Exploration\nBonus',
             'Final Success\nBonus',
-            'Backward\nPenalty'
+            'Backward\nPenalty',
+            'smoothness\nPenalty',
         ]
         graph_data = self.reward_info[step_num]
 
@@ -54,7 +55,8 @@ class EpisodeReplaySystem:
             graph_data['safety_penalty'],
             graph_data['exploration_bonus'],
             graph_data['final_success_bonus'],
-            graph_data['backward_penalty']
+            graph_data['backward_penalty'],
+            graph_data['smoothness_penalty'],
         ]
 
         # Create color map (positive rewards in green, penalties in red)
