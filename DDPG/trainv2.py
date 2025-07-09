@@ -12,6 +12,7 @@ from ploting_utils.plot_learning_curve import Plot_learning_curve
 from truck_trailer_sim.simv2 import Truck_trailer_Env_2
 from episode_replay_collector import EpisodeReplaySystem
 from collections import deque
+from seed_utils import set_seed
 
 # Rich library imports
 from rich.console import Console
@@ -108,7 +109,7 @@ class RichCLI:
                 f"Score:[yellow]{score:8.1f}[/yellow]|"
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
                 f"goal:[green]{success}[/green]|"
-                f"rate:[green]{best_success_rate:8.1f}[/green]|"
+                f"rate:[green]{best_success_rate:8.3f}[/green]|"
                 f"Best:[green]{best_score:8.1f}[/green][bold red]NEW BEST![/bold red]|"
 
             )
@@ -118,7 +119,7 @@ class RichCLI:
                 f"Score:[yellow]{score:8.1f}[/yellow]|"
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
                 f"goal:[green]{success}[/green]|"
-                f"rate:[green]{best_success_rate:8.1f}[/green]|"
+                f"rate:[green]{best_success_rate:8.3f}[/green]|"
                 f"Best:[green]{best_score:8.1f}[/green]"
             )
 
@@ -171,6 +172,18 @@ def prompt_load_checkpoint():
         cli.display_warning("Invalid input. Defaulting to 'n'.")
         return False
 
+def prompt_load_seed():
+    """Original function with rich enhancement"""
+    cli.display_message("🔄 seed loading option", "bold cyan")
+    load_checkpoint = input("want to load seed to reproduce result (n will result in default seed=27) ? (y/n): ").strip().lower()
+    if load_checkpoint == 'y':
+        return True
+    elif load_checkpoint == 'n':
+        return False
+    else:
+        cli.display_warning("Invalid input. Defaulting to 'n'.")
+        return False
+
 
 def prompt_set_parameters():
     """Original function with rich enhancement"""
@@ -186,12 +199,14 @@ def prompt_set_parameters():
         return False
 
 
-def save_training_state(episode_num, score_history, best_score, filename):
+def save_training_state(episode_num, score_history, best_score, best_success_rate, success_history, filename):
     """Save training state for resuming later - ORIGINAL LOGIC PRESERVED"""
     training_state = {
         'episode_num': episode_num,
         'score_history': score_history,
         'best_score': best_score,
+        'best_success_rate': best_success_rate,
+        'success_history': success_history,
         'filename': filename
     }
 
@@ -342,6 +357,16 @@ if __name__ == '__main__':
     else:
         cli.display_info("Starting fresh ono reply buffer (empty)...")
 
+    should_load_seed = prompt_load_seed()
+    if should_load_seed:
+        cli.display_info("Loading seed...")
+        seed = int(input("Enter seed for reproducibility: "))
+    else:
+        cli.display_info("Starting default seed...")
+        seed = 27
+
+    set_seed(seed)
+
     env = Truck_trailer_Env_2()
     replay_system = EpisodeReplaySystem(env)
 
@@ -372,6 +397,7 @@ if __name__ == '__main__':
                       n_actions=env.action_space.shape[0])
         n_games = 5000
 
+
     # ORIGINAL FILENAME GENERATION PRESERVED
     filename = 'truck_trailer_v1' + str(agent.alpha) + '_beta_' + \
                str(agent.beta) + '_' + str(n_games) + '_games'
@@ -382,7 +408,9 @@ if __name__ == '__main__':
 
     # ORIGINAL LOGIC PRESERVED
     best_score = env.reward_range[0]
+    best_success_rate = 0.0
     score_history = []
+    success_history = []
     start_episode = 0
     resume_episode = start_episode
 
@@ -399,8 +427,11 @@ if __name__ == '__main__':
                 score_history = training_state['score_history']
                 best_score = training_state['best_score']
                 resume_episode = training_state['episode_num']
+                best_success_rate = training_state['best_success_rate']
+                success_history = training_state['success_history']
                 cli.display_info(f"Resuming from episode {resume_episode}")
                 cli.display_info(f"Previous best score: {best_score:.2f}")
+                cli.display_info(f"Previous best success rate: {best_success_rate:.3f}")
                 cli.display_info(f"Previous score history length: {len(score_history)}")
 
         except Exception as e:
@@ -437,7 +468,7 @@ if __name__ == '__main__':
     episode_transitions_history = deque(maxlen=200)
     # ORIGINAL TRAINING LOOP LOGIC COMPLETELY PRESERVED
     for i in range(start_episode, end_episode):
-        observation, info = env.reset()
+        observation, info = env.reset(seed=seed + i)
         done = False
         score = 0
         agent.noise.reset()
@@ -494,9 +525,6 @@ if __name__ == '__main__':
         else:
             status = "FAILURE"
 
-        if i == start_episode:
-            success_history = []
-            best_success_rate = 0.0
 
         success_history.append(1 if status == "SUCCESS" else 0)
         success_rate = np.mean(success_history[-100:])
@@ -511,7 +539,7 @@ if __name__ == '__main__':
         # Check if this is a new best score
         if is_best:
             agent.save_models()
-            save_training_state(i + 1, score_history, best_score, filename)
+            save_training_state(i + 1, score_history, best_score, best_success_rate, success_history, filename)
             save_transitions(i, episode_transitions_history)
             best_success_rate = success_rate
             best_score = avg_score
@@ -524,7 +552,7 @@ if __name__ == '__main__':
     # ORIGINAL PLOT GENERATION PRESERVED
     x = [i + 1 for i in range(end_episode)]
     os.makedirs(os.path.dirname(figure_file), exist_ok=True)
-    Plot_learning_curve(x, score_history, figure_file)
+    Plot_learning_curve(x, score_history, success_history, figure_file)
 
     # Final summary
     cli.display_success("Training Complete!")

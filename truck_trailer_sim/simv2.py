@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 import gym
@@ -367,6 +368,9 @@ class Truck_trailer_Env_2(gym.Env):
             ax.plot(x, y, 'o', color=color, markersize=8, label=label, zorder=6)
 
     def reset(self, seed=None, options=None):
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
 
         # Generate valid random start and goal poses
         self.startx, self.starty, self.startyaw, self.goalx, self.goaly, self.goalyaw = self.generate_valid_random_poses()
