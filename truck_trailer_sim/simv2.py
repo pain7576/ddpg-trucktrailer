@@ -179,6 +179,13 @@ class Truck_trailer_Env_2(gym.Env):
         ], dtype=np.float32)
 
         return observation
+
+    def compute_max_steps(self):
+        initial_distance=np.sqrt((self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2)
+        max_step =int(initial_distance/0.40096)+125
+
+        return max_step
+
     def kinematic_model(self, t, x, u):
         """Kinematic model of truck-trailer system."""
         xd = np.zeros(len(x))
@@ -241,8 +248,8 @@ class Truck_trailer_Env_2(gym.Env):
     def generate_valid_random_poses(self, max_attempts=1000):
         """Generate random start and goal poses."""
         for attempt in range(max_attempts):
-            start_x = 0
-            start_y = 10
+            start_x = np.random.uniform(-27, 27)
+            start_y = np.random.uniform(0, 27)
             start_psi2 = np.random.uniform(np.deg2rad(45), np.deg2rad(120))
 
             goal_x = 0
@@ -387,6 +394,8 @@ class Truck_trailer_Env_2(gym.Env):
 
         # Set initial-state             0       1    2   3   4   5
         self.state = np.array([psi_1, psi_2, x1, y1, x2, y2], dtype=np.float32)
+
+        self.max_episode_steps = self.compute_max_steps()
 
         observation = self.compute_observation(self.state, np.deg2rad(0))
         self.episode_steps = 0

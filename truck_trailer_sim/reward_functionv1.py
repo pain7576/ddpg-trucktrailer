@@ -26,7 +26,7 @@ class RewardFunction:
         self.workspace_width = self.max_map_x - self.min_map_x
         self.workspace_height = self.max_map_y - self.min_map_y
         self.max_expected_distance = np.sqrt(self.workspace_width ** 2 + self.workspace_height ** 2)
-        self.max_episode_steps = 110
+
 
         # Initialize previous distance tracking for progress calculation
         # This is crucial for rewarding improvement rather than just proximity
@@ -35,7 +35,7 @@ class RewardFunction:
             (self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2) + 1e-6
 
         current_steering = np.arctan2(self.observation[10],self.observation[11])
-
+        self.max_episode_steps = int(self.initial_distance_to_goal/0.40096) + 125
 
         if previous_distance is not None:
             self.previous_distance = previous_distance
