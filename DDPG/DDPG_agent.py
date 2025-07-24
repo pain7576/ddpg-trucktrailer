@@ -33,12 +33,17 @@ class Agent():
 
         self.update_network_parameters(tau=1)
 
-    def choose_action(self, observation):
+    def choose_action(self, observation , evaluate=False):
         self.actor.eval()
         state = T.tensor([observation], dtype=T.float).to(self.actor.device)
         mu = self.actor.forward(state).to(self.actor.device)
-        mu_prime = mu + T.tensor(self.noise(),
+
+        if not evaluate:
+            mu_prime = mu + T.tensor(self.noise(),
                                     dtype=T.float).to(self.actor.device)
+        else:
+            mu_prime = mu
+
         self.actor.train()
 
         return mu_prime.cpu().detach().numpy()[0]

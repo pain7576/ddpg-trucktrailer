@@ -425,13 +425,13 @@ if __name__ == '__main__':
             training_state = load_training_state(load_filename)
             if training_state is not None:
                 score_history = training_state['score_history']
-                best_score = training_state['best_score']
+                #best_score = training_state['best_score']
                 resume_episode = training_state['episode_num']
-                best_success_rate = training_state['best_success_rate']
+                #best_success_rate = training_state['best_success_rate']
                 success_history = training_state['success_history']
                 cli.display_info(f"Resuming from episode {resume_episode}")
-                cli.display_info(f"Previous best score: {best_score:.2f}")
-                cli.display_info(f"Previous best success rate: {best_success_rate:.3f}")
+                #cli.display_info(f"Previous best score: {best_score:.2f}")
+                #cli.display_info(f"Previous best success rate: {best_success_rate:.3f}")
                 cli.display_info(f"Previous score history length: {len(score_history)}")
 
         except Exception as e:

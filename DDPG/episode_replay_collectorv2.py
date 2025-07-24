@@ -139,6 +139,8 @@ class EpisodeReplaySystem:
             self.env.goalx = env_data['goalx']
             self.env.goaly = env_data['goaly']
             self.env.goalyaw = env_data['goalyaw']
+            self.env.max_episode_steps = self.env.compute_max_steps()
+            self.env.episode_steps = 0
 
         else:
             # If no env_data available, call reset to generate new random scenario
