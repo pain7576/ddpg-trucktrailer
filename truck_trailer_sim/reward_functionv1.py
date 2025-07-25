@@ -35,7 +35,7 @@ class RewardFunction:
             (self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2) + 1e-6
 
         current_steering = np.arctan2(self.observation[10],self.observation[11])
-        self.max_episode_steps = int(self.initial_distance_to_goal/0.40096) + 125
+        self.max_episode_steps = int(self.initial_distance_to_goal/0.40096) + 25
 
         if previous_distance is not None:
             self.previous_distance = previous_distance

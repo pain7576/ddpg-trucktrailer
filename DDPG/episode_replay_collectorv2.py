@@ -9,6 +9,9 @@ class EpisodeReplaySystem:
         self.save_dir = save_dir
         os.makedirs(self.save_dir, exist_ok=True)
         self.env = env
+        # Initialize tracking variables for the twin plot
+        self.cumulative_rewards = []
+        self.step_actions = []
 
     def save_episode(self, episode_num, states, actions, info, env_data=None):
         """Save episode data to file"""
@@ -25,8 +28,93 @@ class EpisodeReplaySystem:
         with open(filepath, 'wb') as f:
             pickle.dump(episode_data, f)
 
+    def plot_twin_graph(self, step_num):
+        """Plot twin x-axis graph showing cumulative reward and actions with modern styling"""
+        # Clear the previous plots
+        self.ax1.clear()
+        self.ax2.clear()
+
+        # Set modern style
+        plt.style.use('default')  # Reset to default then customize
+
+        # Prepare x-axis data (step numbers from 0 to current step)
+        steps = list(range(len(self.cumulative_rewards)))
+
+        # Convert actions from radians to degrees
+        actions_degrees = []
+        for action in self.step_actions:
+            action_deg = np.degrees(action)
+            # Convert to scalar if it's a numpy array
+            if hasattr(action_deg, 'item'):
+                action_deg = action_deg.item()
+            elif hasattr(action_deg, '__len__') and len(action_deg) == 1:
+                action_deg = action_deg[0]
+            actions_degrees.append(action_deg)
+
+        # Modern color palette
+        reward_color = '#2E86C1'  # Modern blue
+        action_color = '#E74C3C'  # Modern red
+
+        # Plot cumulative reward on left y-axis with modern styling
+        line1 = self.ax1.plot(steps, self.cumulative_rewards, color=reward_color, linewidth=3,
+                              marker='o', markersize=6, markerfacecolor=reward_color,
+                              markeredgecolor='white', markeredgewidth=2, alpha=0.8,
+                              label='Cumulative Reward')
+
+        self.ax1.set_xlabel('Step', fontsize=14, fontweight='bold', color='#2C3E50')
+        self.ax1.set_ylabel('Cumulative Reward', color=reward_color, fontsize=14, fontweight='bold')
+        self.ax1.tick_params(axis='y', labelcolor=reward_color, labelsize=11)
+        self.ax1.tick_params(axis='x', labelsize=11, color='#2C3E50')
+
+        # Modern grid styling
+        self.ax1.grid(True, alpha=0.2, linestyle='-', linewidth=0.5, color='#BDC3C7')
+        self.ax1.set_facecolor('#FAFAFA')  # Light background
+
+        # Plot actions on right y-axis with modern styling
+        line2 = self.ax2.plot(steps, actions_degrees, color=action_color, linewidth=3,
+                              marker='s', markersize=6, markerfacecolor=action_color,
+                              markeredgecolor='white', markeredgewidth=2, alpha=0.8,
+                              label='Action')
+
+        self.ax2.set_ylabel('Action (degrees)', color=action_color, fontsize=14, fontweight='bold')
+        self.ax2.tick_params(axis='y', labelcolor=action_color, labelsize=11)
+
+        # Set title with modern styling
+        current_reward = self.cumulative_rewards[-1] if self.cumulative_rewards else 0
+        current_action_degrees = actions_degrees[-1] if actions_degrees else 0
+        # Convert to scalar if it's a numpy array
+        if hasattr(current_action_degrees, 'item'):
+            current_action_degrees = current_action_degrees.item()
+        elif hasattr(current_action_degrees, '__len__') and len(current_action_degrees) == 1:
+            current_action_degrees = current_action_degrees[0]
+
+        title = f'Step {step_num}: Cumulative Reward = {current_reward:.3f}, Action = {current_action_degrees:.1f}°'
+        self.ax1.set_title(title, fontsize=16, fontweight='bold', color='#2C3E50', pad=20)
+
+        # Add subtle border
+        for spine in self.ax1.spines.values():
+            spine.set_color('#BDC3C7')
+            spine.set_linewidth(1)
+        for spine in self.ax2.spines.values():
+            spine.set_color('#BDC3C7')
+            spine.set_linewidth(1)
+
+        # Add legend with modern styling
+        lines1, labels1 = self.ax1.get_legend_handles_labels()
+        lines2, labels2 = self.ax2.get_legend_handles_labels()
+        legend = self.ax1.legend(lines1 + lines2, labels1 + labels2,
+                                 loc='upper left', frameon=True, fancybox=True,
+                                 shadow=True, framealpha=0.9, fontsize=11)
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_edgecolor('#BDC3C7')
+
+        # Update the plot
+        self.fig_twin.tight_layout()
+        self.fig_twin.canvas.draw()
+        self.fig_twin.canvas.flush_events()
+
     def plot_reward_components(self, step_num):
-        """Plot bar chart of reward components in the same window"""
+        """Plot bar chart of reward components with modern styling"""
         # Clear the previous plot
         self.ax.clear()
 
@@ -45,7 +133,6 @@ class EpisodeReplaySystem:
         ]
         graph_data = self.reward_info[step_num]
 
-
         component_values = [
             graph_data['distance_reward'],
             graph_data['progress_reward'],
@@ -59,48 +146,62 @@ class EpisodeReplaySystem:
             graph_data['smoothness_penalty'],
         ]
 
-        # Create color map (positive rewards in green, penalties in red)
+        # Modern color scheme
         colors = []
         for value in component_values:
             if value > 0:
-                colors.append('lightgreen')
+                colors.append('#27AE60')  # Modern green
             elif value < 0:
-                colors.append('lightcoral')
+                colors.append('#E74C3C')  # Modern red
             else:
-                colors.append('lightgray')
+                colors.append('#95A5A6')  # Modern gray
 
-        # Create bar chart
-        bars = self.ax.bar(component_names, component_values, color=colors, alpha=0.7, edgecolor='black')
+        # Create modern bar chart
+        bars = self.ax.bar(component_names, component_values, color=colors, alpha=0.8,
+                           edgecolor='white', linewidth=2, width=0.8)
 
-        # Add value labels on top of bars
+        # Add modern value labels on bars
         for bar, value in zip(bars, component_values):
             height = bar.get_height()
-            self.ax.text(bar.get_x() + bar.get_width() / 2.,
-                         height + (0.01 * max(abs(min(component_values)), max(component_values))),
-                         f'{value:.3f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            label_y = height + (0.02 * max(abs(min(component_values)), max(component_values))) if height >= 0 else height - (0.05 * max(abs(min(component_values)), max(component_values)))
+            self.ax.text(bar.get_x() + bar.get_width() / 2., label_y,
+                         f'{value:.3f}', ha='center', va='bottom' if height >= 0 else 'top',
+                         fontsize=10, fontweight='bold', color='#2C3E50')
 
-        # Customize plot
+        # Modern title styling
         title = f'Reward Components'
         if step_num is not None:
-            title += f' - step {step_num}'
+            title += f' - Step {step_num}'
             title += f' (Total: {graph_data["total_reward"]:.3f})'
 
         if graph_data['final_success_bonus'] > 0:
-            status = "SUCCESS"
+            status = "SUCCESS ✓"
             title += f' - {status}'
+            title_color = '#27AE60'
         else:
-            status = "FAILURE"
+            status = "FAILURE ✗"
             title += f' - {status}'
+            title_color = '#E74C3C'
 
-        self.ax.set_title(title, fontsize=14, fontweight='bold')
-        self.ax.set_ylabel('Reward Value', fontsize=12)
-        self.ax.set_xlabel('Reward Components', fontsize=12)
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=title_color, pad=20)
+        self.ax.set_ylabel('Reward Value', fontsize=14, fontweight='bold', color='#2C3E50')
+        self.ax.set_xlabel('Reward Components', fontsize=14, fontweight='bold', color='#2C3E50')
 
-        # Add horizontal line at y=0
-        self.ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+        # Modern horizontal line at y=0
+        self.ax.axhline(y=0, color='#34495E', linestyle='-', alpha=0.8, linewidth=2)
 
-        # Rotate x-axis labels for better readability
-        self.ax.tick_params(axis='x', rotation=45)
+        # Modern styling
+        self.ax.tick_params(axis='x', rotation=45, labelsize=10, color='#2C3E50')
+        self.ax.tick_params(axis='y', labelsize=11, color='#2C3E50')
+        self.ax.set_facecolor('#FAFAFA')  # Light background
+
+        # Modern grid
+        self.ax.grid(True, alpha=0.2, linestyle='-', linewidth=0.5, color='#BDC3C7', axis='y')
+
+        # Modern border styling
+        for spine in self.ax.spines.values():
+            spine.set_color('#BDC3C7')
+            spine.set_linewidth(1)
 
         # Adjust layout to prevent label cutoff
         self.fig.tight_layout()
@@ -108,7 +209,6 @@ class EpisodeReplaySystem:
         # Update the plot
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-
 
     def replay_episode(self, episode_num, reward_for_filename):
         """Load and replay a specific episode"""
@@ -125,6 +225,11 @@ class EpisodeReplaySystem:
         actions = episode_data['actions']
         env_data = episode_data.get('env_data', None)
         self.reward_info = episode_data['info']
+
+        # Reset tracking variables for new episode
+        self.cumulative_rewards = []
+        self.step_actions = []
+
         print(f"\nReplaying Episode {episode_num}")
         print(f"Total steps: {len(states) - 1}")
 
@@ -141,30 +246,46 @@ class EpisodeReplaySystem:
             self.env.goalyaw = env_data['goalyaw']
             self.env.max_episode_steps = self.env.compute_max_steps()
             self.env.episode_steps = 0
-
         else:
             # If no env_data available, call reset to generate new random scenario
             print("No environment data found, generating new random scenario...")
             self.env.reset()
             self.env.state = states[0]  # Override with saved initial state
 
+        # Create two separate figure windows
+        self.fig, self.ax = plt.subplots(figsize=(12, 6))  # Reward components plot
+        self.fig_twin, self.ax1 = plt.subplots(figsize=(12, 6))  # Twin plot
+        self.ax2 = self.ax1.twinx()  # Create twin y-axis
 
-        self.fig, self.ax = plt.subplots(figsize=(12, 6))  # Create attributes
         plt.ion()  # Turn on interactive mode
         self.fig.show()
+        self.fig_twin.show()
 
         # Render initial state
         self.env.render()
+
+        # Initialize cumulative reward to 0
+        cumulative_reward = 0
 
         # Step through the episode
         for i in range(len(actions)):
             # Apply the recorded action
             observation, reward, done, info = self.env.step(actions[i])
+
+            # Update cumulative reward and action tracking
+            step_reward = self.reward_info[i]['total_reward']
+            cumulative_reward += step_reward
+            self.cumulative_rewards.append(cumulative_reward)
+            self.step_actions.append(actions[i])
+
+            # Render and update plots
             self.env.render()
             self.plot_reward_components(i)
+            self.plot_twin_graph(i)
 
             if done:
                 print(f"Episode ended at step {i + 1}")
                 break
 
         print("Replay complete!")
+        plt.show(block=True)

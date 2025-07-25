@@ -27,7 +27,7 @@ from rich.align import Align
 from rich import box
 from rich.columns import Columns
 import time
-
+import keyboard
 # Initialize rich console
 console = Console()
 
@@ -464,6 +464,7 @@ if __name__ == '__main__':
 
     # Enhanced training loop with progress tracking
     cli.display_message(f"🎯 Starting Training: Episodes {start_episode} to {end_episode - 1}", "bold cyan")
+    cli.display_info("Press the 'ESC' key to stop training early and generate the plot.")
 
     episode_transitions_history = deque(maxlen=200)
     # ORIGINAL TRAINING LOOP LOGIC COMPLETELY PRESERVED
@@ -548,9 +549,22 @@ if __name__ == '__main__':
         # Enhanced display but original print logic preserved
         cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, is_best)
 
+        try:
+            if keyboard.is_pressed('escape'):
+                cli.display_warning("\nEscape key detected. Halting training and proceeding to plot generation...")
+                break # Exit the for loop
+        except ImportError:
+            # Handle case where keyboard library is not installed or has issues
+            if i == start_episode: # Only show this warning once
+                cli.display_warning("Could not check for ESC key. Please install the 'keyboard' library (`pip install keyboard`) to enable this feature.")
+        except Exception as e:
+            # Handle other potential errors, e.g., permissions on Linux
+            if i == start_episode: # Only show this warning once
+                cli.display_warning(f"Could not check for ESC key. The 'keyboard' library may require special permissions (e.g., 'sudo' on Linux).")
+
 
     # ORIGINAL PLOT GENERATION PRESERVED
-    x = [i + 1 for i in range(end_episode)]
+    x = [i + 1 for i in range(len(score_history))]
     os.makedirs(os.path.dirname(figure_file), exist_ok=True)
     Plot_learning_curve(x, score_history, success_history, figure_file)
 

@@ -182,7 +182,7 @@ class Truck_trailer_Env_2(gym.Env):
 
     def compute_max_steps(self):
         initial_distance=np.sqrt((self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2)
-        max_step =int(initial_distance/0.40096)+125
+        max_step =int(initial_distance/0.40096)+ 25
 
         return max_step
 
@@ -245,18 +245,18 @@ class Truck_trailer_Env_2(gym.Env):
         )
         return out_of_bounds_truck or out_of_bounds_trailer
 
-    def generate_valid_random_poses(self, max_attempts=1000):
+    def generate_valid_random_poses(self):
         """Generate random start and goal poses."""
-        for attempt in range(max_attempts):
-            start_x = np.random.uniform(-27, 27)
-            start_y = np.random.uniform(0, 27)
-            start_psi2 = np.random.uniform(np.deg2rad(45), np.deg2rad(120))
 
-            goal_x = 0
-            goal_y = -30
-            goal_psi = np.deg2rad(90)
+        start_x = np.random.uniform(-27, 27)
+        start_y = np.random.uniform(0, 27)
+        start_psi2 = np.random.uniform(np.deg2rad(45), np.deg2rad(120))
 
-            return (start_x, start_y, start_psi2, goal_x, goal_y, goal_psi)
+        goal_x = 0
+        goal_y = -30
+        goal_psi = np.deg2rad(90)
+
+        return (start_x, start_y, start_psi2, goal_x, goal_y, goal_psi)
 
     def check_if_past_goal(self, goal_y, trailer_y):
         if goal_y > trailer_y:
