@@ -434,34 +434,6 @@ class RewardFunction:
         else:  # Taking too long
             return 0
 
-    def check_episode_termination(self):
-        """
-        Check various termination conditions and determine if episode should end.
-        """
-        # Success condition
-        current_distance = self._calculate_raw_distance()
-        orientation_error = abs(np.arctan2(self.observation[19], self.observation[20]))
-
-        success = (current_distance <= self.position_threshold and
-                   orientation_error <= self.orientation_threshold)
-
-        # Failure conditions
-        theta_diff = self.state[0] - self.state[1]
-        jackknife = abs(theta_diff) > np.deg2rad(90)
-
-        # Strict boundary check for termination (more lenient than penalty check)
-        truck_x, truck_y = self.state[2], self.state[3]
-        trailer_x, trailer_y = self.state[4], self.state[5]
-        out_of_bounds = (truck_x < self.min_map_x - 3 or truck_x > self.max_map_x + 3 or
-                         truck_y < self.min_map_y - 3 or truck_y > self.max_map_y + 3 or
-                         trailer_x < self.min_map_x - 3 or trailer_x > self.max_map_x + 3 or
-                         trailer_y < self.min_map_y - 3 or trailer_y > self.max_map_y + 3)
-
-        max_steps = self.episode_steps >= self.max_episode_steps
-
-        done = success or jackknife or out_of_bounds or max_steps
-
-        return done, success, jackknife, out_of_bounds, max_steps
 
     def compute_reward(self):
         """
@@ -485,11 +457,14 @@ class RewardFunction:
         backward_penalty, backward_info = self.calculate_backward_movement_penalty()
         smoothness_penalty = self.calculate_steering_smoothness_penalty()
 
-        # Check termination conditions
-        done, success, jackknife, out_of_bounds, max_steps = self.check_episode_termination()
 
         # Final success bonus
+        current_distance = self._calculate_raw_distance()
+        orientation_error = abs(np.arctan2(self.observation[19], self.observation[20]))
+        success = (current_distance <= self.position_threshold and
+                   orientation_error <= self.orientation_threshold)
         final_success_bonus = self.weights['final_success'] if success else 0
+
         self.previous_distance = self._calculate_raw_distance()
 
         # Combine all components with their weights
@@ -521,7 +496,6 @@ class RewardFunction:
             'backward_penalty' : backward_penalty * self.weights['backward_movement'],
             'smoothness_penalty' : smoothness_penalty * self.weights['smoothness_penalty'],
             'backward_movement_info': backward_info,
-            'done': done,
             'success': success
         }
 

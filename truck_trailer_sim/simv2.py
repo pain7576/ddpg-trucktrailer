@@ -290,7 +290,8 @@ class Truck_trailer_Env_2(gym.Env):
 
         reward, reward_info = reward_function.compute_reward()
         self.reward_state = reward_function.get_persistent_state()
-        return reward, reward_info, reward_function.check_excessive_backward_movement()
+        return reward, reward_info, reward_function
+
 
     def plot_vehicle(self, ax, x, y, heading, length, width, label, color='blue', show_wheels=True, steering_angle=0.0):
         """Plot vehicle visualization."""
@@ -428,6 +429,8 @@ class Truck_trailer_Env_2(gym.Env):
         # Increment step counter
         self.episode_steps += 1
 
+        total_reward, reward_dict, reward_function_instance = self._compute_reward_with_state(observation, self.state)
+
         # check episode end condition
         self.jackknife = self.check_jackknife(new_state[0], new_state[1])
         self.out_of_map = self.check_out_of_Map(new_state[2], new_state[3], new_state[4], new_state[5])
@@ -439,7 +442,8 @@ class Truck_trailer_Env_2(gym.Env):
         self.goal_reached = position_error <= self.position_threshold and abs(
             orientation_error) <= self.orientation_threshold
 
-        total_reward, reward_dict, excessive_backward = self._compute_reward_with_state(observation, self.state)
+        excessive_backward = reward_function_instance.check_excessive_backward_movement()
+
 
         done = self.jackknife or self.out_of_map or self.max_steps_reached or self.goal_reached or self.goal_passed or excessive_backward
 
