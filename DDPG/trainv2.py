@@ -101,7 +101,7 @@ class RichCLI:
 
         self.console.print(config_table)
 
-    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, is_best=False):
+    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, total_steps, is_best=False):
         """Display episode results with beautiful formatting"""
         if is_best:
             self.console.print(
@@ -110,7 +110,8 @@ class RichCLI:
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
                 f"goal:[green]{success}[/green]|"
                 f"rate:[green]{best_success_rate:8.3f}[/green]|"
-                f"Best:[green]{best_score:8.1f}[/green][bold red]NEW BEST![/bold red]|"
+                f"Best:[green]{best_score:8.1f}[/green]|"
+                f"Steps:[magenta]{total_steps}[/magenta][bold red]NEW BEST![/bold red]|"
 
             )
         else:
@@ -120,7 +121,8 @@ class RichCLI:
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
                 f"goal:[green]{success}[/green]|"
                 f"rate:[green]{best_success_rate:8.3f}[/green]|"
-                f"Best:[green]{best_score:8.1f}[/green]"
+                f"Best:[green]{best_score:8.1f}[/green]|"
+                f"Steps:[magenta]{total_steps}[/magenta]"
             )
 
     def display_message(self, message, style="white"):
@@ -199,7 +201,7 @@ def prompt_set_parameters():
         return False
 
 
-def save_training_state(episode_num, score_history, best_score, best_success_rate, success_history, filename):
+def save_training_state(episode_num, score_history, best_score, best_success_rate, success_history, total_steps, filename):
     """Save training state for resuming later - ORIGINAL LOGIC PRESERVED"""
     training_state = {
         'episode_num': episode_num,
@@ -207,6 +209,7 @@ def save_training_state(episode_num, score_history, best_score, best_success_rat
         'best_score': best_score,
         'best_success_rate': best_success_rate,
         'success_history': success_history,
+        'total_steps': total_steps,
         'filename': filename
     }
 
@@ -413,6 +416,7 @@ if __name__ == '__main__':
     success_history = []
     start_episode = 0
     resume_episode = start_episode
+    total_steps = 0
 
     if should_load:
         additional_episode = int(input("Enter number of additional episodes: "))
@@ -429,10 +433,12 @@ if __name__ == '__main__':
                 resume_episode = training_state['episode_num']
                 #best_success_rate = training_state['best_success_rate']
                 success_history = training_state['success_history']
+                total_steps = training_state.get('total_steps', 0)
                 cli.display_info(f"Resuming from episode {resume_episode}")
                 #cli.display_info(f"Previous best score: {best_score:.2f}")
                 #cli.display_info(f"Previous best success rate: {best_success_rate:.3f}")
                 cli.display_info(f"Previous score history length: {len(score_history)}")
+                cli.display_info(f"Previous total steps: {total_steps}")
 
         except Exception as e:
             cli.display_error(f"Error loading pre-trained model: {e}")
@@ -511,6 +517,7 @@ if __name__ == '__main__':
             agent.learn()
             score += reward
             observation = observation_
+            total_steps += 1
 
         episode_transitions_history.append(episode_transitions)
 
@@ -540,14 +547,14 @@ if __name__ == '__main__':
         # Check if this is a new best score
         if is_best:
             agent.save_models()
-            save_training_state(i + 1, score_history, best_score, best_success_rate, success_history, filename)
+            save_training_state(i + 1, score_history, best_score, best_success_rate, success_history, total_steps, filename)
             save_transitions(i, episode_transitions_history)
             best_success_rate = success_rate
             best_score = avg_score
 
 
         # Enhanced display but original print logic preserved
-        cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, is_best)
+        cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, total_steps, is_best)
 
         try:
             if keyboard.is_pressed('escape'):
@@ -572,3 +579,4 @@ if __name__ == '__main__':
     cli.display_success("Training Complete!")
     cli.display_info(f"Plot saved to {figure_file}")
     cli.display_info(f"Final best score: {best_score:.2f}")
+    cli.display_info(f"Total steps taken: {total_steps}")
