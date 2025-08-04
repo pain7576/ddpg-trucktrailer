@@ -109,7 +109,7 @@ def generate_heatmap_data(agent, env):
                     observation = observation_
 
                 # Record the results for this trial
-                is_success = info.get('final_success_bonus', 0) > 0
+                is_success = info.get('success', False)
                 cell_scores.append(score)
                 cell_successes.append(1 if is_success else 0)
 
@@ -120,6 +120,72 @@ def generate_heatmap_data(agent, env):
                 orientations_data.extend(cell_orientations)
 
     return reward_grid, success_grid, x_coords, y_coords, orientations_data
+
+def plot_success_distribution(grid_data, title, filename):
+    """
+    Creates a bar graph showing the distribution of success rates.
+    Specifically designed for success rates: 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
+
+    Args:
+        grid_data: 2D numpy array with success rate values (may contain NaN)
+        title: Title for the plot
+        filename: Output filename for the plot
+    """
+    # Remove NaN values
+    valid_data = grid_data[~np.isnan(grid_data)]
+
+    if len(valid_data) == 0:
+        print(f"Warning: No valid data for '{title}' distribution. Cannot generate bar graph.")
+        return
+
+    print(f"Generating success rate distribution bar graph: {title}")
+
+    # Define the exact success rate values (based on TRIALS_PER_CELL = 5)
+    success_rates = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    success_labels = ['0%', '20%', '40%', '60%', '80%', '100%']
+
+    # Count occurrences of each success rate
+    counts = []
+    for rate in success_rates:
+        count = np.sum(np.abs(valid_data - rate) < 0.01)  # Small tolerance for floating point comparison
+        counts.append(count)
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Create bar chart with colors from plasma colormap
+    colors = plt.cm.plasma(np.array(success_rates))
+    bars = ax.bar(success_labels, counts, color=colors, alpha=0.8,
+                  edgecolor='black', linewidth=1)
+
+    # Add value labels on top of bars
+    max_count = max(counts) if counts else 1
+    for i, (label, count) in enumerate(zip(success_labels, counts)):
+        if count > 0:  # Only label non-zero bars
+            ax.text(i, count + max_count * 0.01,
+                    str(int(count)), ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+    # Formatting
+    ax.set_title(f'Success Rate Distribution\n({len(valid_data)} grid cells total)', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Success Rate', fontsize=12)
+    ax.set_ylabel('Number of Grid Cells', fontsize=12)
+    ax.grid(True, axis='y', alpha=0.3)
+
+    # Add statistics text box
+    stats_text = f'Total Cells: {len(valid_data)}\n'
+    stats_text += f'Mean Success: {np.mean(valid_data):.1%}\n'
+    stats_text += f'Cells with 100% Success: {counts[5]}\n'
+    stats_text += f'Cells with 0% Success: {counts[0]}\n'
+    stats_text += f'Cells with Partial Success: {sum(counts[1:5])}'
+
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+
+    # Save the figure
+    output_path = os.path.join(OUTPUT_DIR, filename)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Success rate distribution bar graph saved to {output_path}")
 
 def plot_heatmap(grid_data, x_coords, y_coords, orientations_data, title, cmap, filename):
     """
@@ -241,7 +307,16 @@ def main():
         filename='heatmap_success_rate.png'
     )
 
-    print("\n✅ Heatmap generation complete!")
+    # --- Plot Value Distribution Bar Graphs ---
+
+    plot_success_distribution(
+        grid_data=success_data,
+        title='Success Rate Distribution',
+        filename='distribution_success_rate.png'
+    )
+
+
+    print("\n✅ Heatmap and distribution analysis complete!")
 
 if __name__ == '__main__':
     main()
