@@ -101,29 +101,34 @@ class RichCLI:
 
         self.console.print(config_table)
 
-    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, total_steps, is_best=False):
+    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, total_steps,is_best=False):
         """Display episode results with beautiful formatting"""
+        # Colorize success: red if "FAILURE", else green
+        success_display = (
+            f"[red]{success}[/red]" if success == "FAILURE" else f"[green]{success}[/green]"
+        )
+
         if is_best:
             self.console.print(
                 f"🏆[bold green]Episode {episode:4d}[/bold green]|"
                 f"Score:[yellow]{score:8.1f}[/yellow]|"
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
-                f"goal:[green]{success}[/green]|"
+                f"goal:{success_display}|"
                 f"rate:[green]{best_success_rate:8.3f}[/green]|"
                 f"Best:[green]{best_score:8.1f}[/green]|"
                 f"Steps:[magenta]{total_steps}[/magenta][bold red]NEW BEST![/bold red]|"
-
             )
         else:
             self.console.print(
                 f"📈[bold white]Episode {episode:4d}[/bold white]|"
                 f"Score:[yellow]{score:8.1f}[/yellow]|"
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
-                f"goal:[green]{success}[/green]|"
+                f"goal:{success_display}|"
                 f"rate:[green]{best_success_rate:8.3f}[/green]|"
                 f"Best:[green]{best_score:8.1f}[/green]|"
                 f"Steps:[magenta]{total_steps}[/magenta]"
             )
+
 
     def display_message(self, message, style="white"):
         """Display a styled message"""
@@ -398,7 +403,7 @@ if __name__ == '__main__':
                       input_dims=env.observation_space.shape, tau=0.001,
                       batch_size=64, fc1_dims=400, fc2_dims=300,
                       n_actions=env.action_space.shape[0])
-        n_games = 5000
+        n_games = 10000
 
 
     # ORIGINAL FILENAME GENERATION PRESERVED
