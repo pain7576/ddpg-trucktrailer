@@ -182,7 +182,7 @@ class Truck_trailer_Env_2(gym.Env):
 
     def compute_max_steps(self):
         initial_distance=np.sqrt((self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2)
-        max_step =int(initial_distance/0.40096)+ 25
+        max_step =int(initial_distance/0.40096)+ 125
 
         return max_step
 

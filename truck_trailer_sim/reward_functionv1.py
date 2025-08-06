@@ -35,7 +35,7 @@ class RewardFunction:
             (self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2) + 1e-6
 
         current_steering = np.arctan2(self.observation[10],self.observation[11])
-        self.max_episode_steps = int(self.initial_distance_to_goal/0.40096) + 25
+        self.max_episode_steps = int(self.initial_distance_to_goal/0.40096) + 125
 
         if previous_distance is not None:
             self.previous_distance = previous_distance
@@ -87,7 +87,7 @@ class RewardFunction:
             'progress_reward': 15.0,  # Reward for getting closer
             'Heading_alignment': 15.0,  # Reward for pointing correctly
             'Orientation_alignment': 15.0, #Reward for pointing to correctly with goal pose
-            'smoothness_penalty': -10.0,   # penalty for jerky steering movements
+            'smoothness_penalty': -25.0,   # penalty for jerky steering movements
             'staged_success': [10, 25, 100],  # Progressive success bonuses
             'safety_major': -500.0,  # Reduced from -1000 to allow risk-taking
             'safety_minor': -50.0,  # Minor safety violations
@@ -413,6 +413,10 @@ class RewardFunction:
         if self.episode_steps >= self.max_episode_steps:
             safety_penalty += self.weights['safety_major']
             violation_type = "max_step"
+
+        if self.check_excessive_backward_movement():
+            safety_penalty += self.weights['safety_major']
+            violation_type = "excessive_backward"
 
         return safety_penalty, violation_type
 
