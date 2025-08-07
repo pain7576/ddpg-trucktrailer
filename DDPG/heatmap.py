@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from DDPG_agent import Agent
 from truck_trailer_sim.simv2 import Truck_trailer_Env_2
+from seed_utils import set_seed
 
 # --- Configuration ---
 # --- IMPORTANT: Running this script can take a very long time! ---
@@ -17,6 +18,8 @@ from truck_trailer_sim.simv2 import Truck_trailer_Env_2
 # 2. Decrease the area to test by changing MAP_X_RANGE or MAP_Y_RANGE
 # 3. Decrease TRIALS_PER_CELL
 
+
+SEED = 66
 # --- Grid and Test Configuration ---
 GRID_RESOLUTION = 2.0  # The size of each grid cell (e.g., 2.0 means 2x2 meter cells).
 TRIALS_PER_CELL = 5    # Number of episodes to run for each grid cell.
@@ -262,6 +265,10 @@ def main():
     """
     Main function to initialize agent, generate data, and plot heatmaps.
     """
+
+    if SEED is not None:
+        set_seed(SEED)
+
     # --- Initialize Environment and Agent ---
     env = Truck_trailer_Env_2()
     agent = Agent(alpha=0.0001, beta=0.001,

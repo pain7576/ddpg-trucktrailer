@@ -180,9 +180,89 @@ class Truck_trailer_Env_2(gym.Env):
 
         return observation
 
+    def compute_observation1(self, state, steering_angle):
+        """Compute the enhanced observation vector from the current state."""
+        # Extract state components
+        psi_1, psi_2, x1, y1, x2, y2 = state
+
+
+        # Normalize positions to [-1, 1] based on workspace center
+        truck_x_norm = (x1 - (self.max_map_x + self.min_map_x) / 2) / (self.workspace_width / 2)
+        truck_y_norm = (y1 - (self.max_map_y + self.min_map_y) / 2) / (self.workspace_height / 2)
+        trailer_x_norm = (x2 - (self.max_map_x + self.min_map_x) / 2) / (self.workspace_width / 2)
+        trailer_y_norm = (y2 - (self.max_map_y + self.min_map_y) / 2) / (self.workspace_height / 2)
+        goal_x_norm = (self.goalx - (self.max_map_x + self.min_map_x) / 2) / (self.workspace_width / 2)
+        goal_y_norm = (self.goaly - (self.max_map_y + self.min_map_y) / 2) / (self.workspace_height / 2)
+
+        # Compute hitch-angle
+        hitch_angle = psi_1 - psi_2
+
+        # Compute distance to goal
+        distance_to_goal = np.sqrt((x2 - self.goalx) ** 2 + (y2 - self.goaly) ** 2)
+        distance_to_goal_norm = np.clip(distance_to_goal / self.max_expected_distance, 0, 1)
+
+        # Compute angle from trailer to goal
+        angle_to_goal = np.arctan2(self.goaly - y2, self.goalx - x2)
+
+        # Compute orientation error
+        orientation_error = self.goalyaw - psi_2
+
+        # Compute position error in trailer's local coordinate frame
+        dx_global = self.goalx - x2
+        dy_global = self.goaly - y2
+        dx_local = dx_global * np.cos(psi_2) + dy_global * np.sin(psi_2)
+        dy_local = -dx_global * np.sin(psi_2) + dy_global * np.cos(psi_2)
+
+        # Compute heading error
+        heading_error = angle_to_goal - (psi_2 + np.deg2rad(180))
+
+        # Normalize local errors
+        dx_local_norm = np.clip(dx_local / self.max_expected_distance, -1, 1)
+        dy_local_norm = np.clip(dy_local / self.max_expected_distance, -1, 1)
+
+
+
+        # Construct observation vector
+        observation = np.array([
+            # Truck state (normalized position + angle as sin/cos)
+            truck_x_norm, #0
+            truck_y_norm, #1
+            np.sin(psi_1), #2
+            np.cos(psi_1), #3
+
+            # Trailer state (normalized position + angle as sin/cos)
+            trailer_x_norm, #4
+            trailer_y_norm, #5
+            np.sin(psi_2), #6
+            np.cos(psi_2), #7
+
+            # system dynamics (hitch angle as sin/cos) and (steering angle as sin/cos)
+            np.sin(hitch_angle), #8
+            np.cos(hitch_angle), #9
+            np.sin(steering_angle), #10
+            np.cos(steering_angle), #11
+
+            # Goal (normalized position + angle as sin/cos)
+            goal_x_norm, #12
+            goal_y_norm, #13
+            np.sin(self.goalyaw), #14
+            np.cos(self.goalyaw), #15
+
+            # Relative measurements
+            distance_to_goal_norm, #16
+            dx_local_norm, #17
+            dy_local_norm, #18
+            np.sin(orientation_error), #19
+            np.cos(orientation_error), #20
+            np.sin(heading_error), #21
+            np.cos(heading_error) #22
+        ], dtype=np.float32)
+
+        return observation
+
     def compute_max_steps(self):
         initial_distance=np.sqrt((self.goalx - self.startx) ** 2 + (self.goaly - self.starty) ** 2)
-        max_step =int(initial_distance/0.40096)+ 125
+        max_step =int(initial_distance/0.40096)+ 75
 
         return max_step
 
@@ -425,11 +505,12 @@ class Truck_trailer_Env_2(gym.Env):
         self.state = new_state
 
         observation = self.compute_observation(self.state, action)
+        observation1 = self.compute_observation1(self.state, action)
 
         # Increment step counter
         self.episode_steps += 1
 
-        total_reward, reward_dict, reward_function_instance = self._compute_reward_with_state(observation, self.state)
+        total_reward, reward_dict, reward_function_instance = self._compute_reward_with_state(observation1, self.state)
 
         # check episode end condition
         self.jackknife = self.check_jackknife(new_state[0], new_state[1])
@@ -438,7 +519,7 @@ class Truck_trailer_Env_2(gym.Env):
         self.goal_passed = self.check_if_past_goal(self.goaly, self.state[5])
 
         position_error = np.sqrt((self.state[4] - self.goalx) ** 2 + (self.state[5] - self.goaly) ** 2)
-        orientation_error = np.arctan2(observation[19], observation[20])
+        orientation_error = np.arctan2(observation1[19], observation1[20])
         self.goal_reached = position_error <= self.position_threshold and abs(
             orientation_error) <= self.orientation_threshold
 
@@ -485,7 +566,7 @@ class Truck_trailer_Env_2(gym.Env):
         self.ax.set_ylim(self.min_map_y, self.max_map_y)
         self.ax.set_aspect('equal')
 
-        observation = self.compute_observation(self.state, self.steering_angle)
+        #observation = self.compute_observation(self.state, self.steering_angle)
         #reward_class = RewardFunction(observation, self.state, self.episode_steps, self.position_threshold, self.orientation_threshold, self.goalx, self.goaly)
         #total_reward, reward_dict = reward_class.compute_reward()
 

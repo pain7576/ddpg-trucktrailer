@@ -403,7 +403,7 @@ if __name__ == '__main__':
                       input_dims=env.observation_space.shape, tau=0.001,
                       batch_size=64, fc1_dims=400, fc2_dims=300,
                       n_actions=env.action_space.shape[0])
-        n_games = 10000
+        n_games = 5000
 
 
     # ORIGINAL FILENAME GENERATION PRESERVED

@@ -1,42 +1,70 @@
+import os
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Load the transitions from pickle file
-filename = "replay_buffer/transitions_episode_51_replay_buffer.pkl"  # Change to your actual filename
+folder_path = r'C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\plots'  # replace with the path to your folder
 
-with open(filename, 'rb') as f:
-    transitions_data = pickle.load(f)
+# Dictionary to store data with filename (without .pkl) as keys
+data_dict = {}
 
-print(f"Loaded transitions from {filename}")
-print(f"Number of episodes: {len(transitions_data)}")
+# Load all pickle files
+for filename in os.listdir(folder_path):
+    if filename.endswith('.pkl'):
+        file_path = os.path.join(folder_path, filename)
+        with open(file_path, 'rb') as file:
+            data = pickle.load(file)
+            var_name = os.path.splitext(filename)[0]  # remove '.pkl'
+            data_dict[var_name] = data
 
-# Show info about each episode
-for i, episode in enumerate(transitions_data):
-    print(f"Episode {i}: {len(episode)} transitions")
+# Extract score_history from all files
+score_histories = {}
+for name, data in data_dict.items():
+    if 'score_history' in data:
+        score_histories[name] = data['score_history']
+    else:
+        print(f"Warning: 'score_history' not found in {name}.pkl")
 
-# Access specific data
-if len(transitions_data) > 0:
-    first_episode = transitions_data[0]
-    first_transition = first_episode[0]
+# Find the maximum length among all score histories
+max_length = max(len(scores) for scores in score_histories.values()) if score_histories else 0
 
-    observation, action, reward, observation_, done = first_transition
+if max_length == 0:
+    print("No valid score histories found!")
+    exit()
 
-    print("\nFirst transition of first episode:")
-    print(f"Observation shape: {observation.shape}")
-    print(f"Action shape: {action.shape}")
-    print(f"Reward: {reward}")
-    print(f"Next observation shape: {observation_.shape}")
-    print(f"Done: {done}")
+# Pad all arrays to have the same length
+padded_scores = {}
+for name, scores in score_histories.items():
+    if len(scores) < max_length:
+        padded_scores[name] = np.pad(scores, (0, max_length - len(scores)), 'constant')
+    else:
+        padded_scores[name] = np.array(scores)
 
-    print(f"\nObservation values: {observation}")
-    print(f"Action values: {action}")
+# Create x-axis (episode numbers)
+x = [i + 1 for i in range(max_length)]
 
-# Count total transitions
-total_transitions = sum(len(episode) for episode in transitions_data)
-print(f"\nTotal transitions across all episodes: {total_transitions}")
+# Calculate running averages and plot
+plt.figure(figsize=(12, 8))
 
-# Example: Access transition 5 from episode 2 (if exists)
-if len(transitions_data) > 2 and len(transitions_data[2]) > 5:
-    obs, act, rew, obs_, done = transitions_data[2][5]
-    print(f"\nEpisode 2, Transition 5:")
-    print(f"Action: {act}, Reward: {rew}, Done: {done}")
+for name, scores in padded_scores.items():
+    running_avg = np.zeros(max_length)
+    for i in range(max_length):
+        # Calculate running average over last 100 episodes (or all available if less than 100)
+        running_avg[i] = np.mean(scores[max(0, i-99):i+1])
+
+    plt.plot(x, running_avg, label=f'Running Average {name}')
+
+plt.xlabel('Episode')
+plt.ylabel('Running Average Score')
+plt.title('Running Averages of All Score Histories')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Print summary information
+print(f"\nSummary:")
+print(f"Total files processed: {len(score_histories)}")
+print(f"Maximum episode count: {max_length}")
+for name, scores in score_histories.items():
+    print(f"{name}: {len(scores)} episodes")
