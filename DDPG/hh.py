@@ -55,7 +55,7 @@ for name, scores in padded_scores.items():
     plt.plot(x, running_avg, label=f'Running Average {name}')
 
 plt.xlabel('Episode')
-plt.ylabel('Running Average Score')
+plt.ylabel('Running Average Reward')
 plt.title('Running Averages of All Score Histories')
 plt.legend()
 plt.grid(True)

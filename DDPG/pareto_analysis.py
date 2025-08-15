@@ -214,7 +214,7 @@ def main():
                 console.print(f"⚠️  [yellow]Skipping malformed file:[/yellow] {filename}")
                 continue
 
-    parsed_files.sort(key=lambda item: item[0], reverse=False)
+    parsed_files.sort(key=lambda item: item[0], reverse=True)
     limit = 50 # Reduced for faster debugging, you can set it back to 400
     replay_files_to_process = [item[1] for item in parsed_files[:limit]]
 
