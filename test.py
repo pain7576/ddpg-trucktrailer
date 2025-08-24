@@ -1,22 +1,42 @@
+import torch
+from DDPG.DDPG_agent import Agent
 
-class fifo:
-    def __init__(self, maxsize):
-        self.maxsize = maxsize
+def find_1d_input_length(model_path, device="cpu", batch_size=1, min_len=1, max_len=5000):
+    """
+    Finds the input vector length for a 1D PyTorch model.
 
-    def add_to_fifo(self, name , item):
-       name.append(item)
-       if len(arr) > self.maxsize:
-           arr.pop(0)
+    Args:
+        model_path (str): Path to .pt or .pth model file
+        device (str): 'cpu' or 'cuda'
+        batch_size (int): Batch size to test
+        min_len (int): Minimum input length to try
+        max_len (int): Maximum input length to try
 
-# Usage
-fifo = fifo(3)
-arr = []
+    Returns:
+        tuple or None: (batch_size, length) if found
+    """
+    # Load model
+    model = torch.load(model_path, map_location=device)
+    if hasattr(model, 'eval'):
+        model.eval()
+    else:
+        raise ValueError("The loaded object is not a PyTorch model.")
 
+    # Try different vector lengths
+    for length in range(min_len, max_len + 1):
+        try:
+            x = torch.randn(batch_size, length).to(device)
+            with torch.no_grad():
+                model(x)
+            print(f"✅ Model works with input shape: ({batch_size}, {length})")
+            return (batch_size, length)
+        except Exception:
+            continue
 
-fifo.add_to_fifo(arr, 1)
-fifo.add_to_fifo(arr, 2)
-fifo.add_to_fifo(arr, 3)
-fifo.add_to_fifo(arr, 4)
-fifo.add_to_fifo(arr, 5)
+    print("❌ Could not determine input length.")
+    return None
 
-print(arr)
+# Example usage
+path = r'C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\tmp\ddpg\actor_ddpg'
+shape = find_1d_input_length(path)
+print("Detected input shape:", shape)

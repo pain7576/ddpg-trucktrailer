@@ -39,6 +39,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def generate_heatmap_data(agent, env):
     """
     Iterates through a grid of starting positions, runs episodes, and collects data.
+    Now also collects trajectory end points and violation types.
     """
     print("--- Starting Heatmap Data Generation ---")
     print(f"Grid Resolution: {GRID_RESOLUTION}x{GRID_RESOLUTION}m")
@@ -58,15 +59,22 @@ def generate_heatmap_data(agent, env):
     # Store exact orientations for each trial - list of lists
     orientations_data = []
 
+    # Store trajectory end points and violation types
+    trajectory_endpoints = []
+
+    # Store full trajectories - one per cell
+    trajectories_data = []
+
     # Use tqdm for a progress bar
     for iy, start_y in enumerate(tqdm(y_coords, desc="Testing Grid Rows")):
         for ix, start_x in enumerate(x_coords):
             cell_scores = []
             cell_successes = []
             cell_orientations = []
+            cell_trajectory = None  # Will store one trajectory per cell
 
             # Run multiple trials for the current grid cell
-            for _ in range(TRIALS_PER_CELL):
+            for trial_idx in range(TRIALS_PER_CELL):
                 # --- Set up the environment for a specific start pose ---
                 env.reset() # Reset to clear any old state
 
@@ -78,6 +86,7 @@ def generate_heatmap_data(agent, env):
                 start_yaw_deg = np.random.uniform(START_ORIENTATION_RANGE_DEG[0], START_ORIENTATION_RANGE_DEG[1])
                 start_yaw_rad = np.deg2rad(start_yaw_deg)
                 env.startx, env.starty, env.startyaw = start_x, start_y, start_yaw_rad
+                env.L2 = np.random.uniform(5,7)
 
                 # Store the exact orientation used
                 cell_orientations.append({
@@ -92,6 +101,18 @@ def generate_heatmap_data(agent, env):
 
                 # Manually calculate and set the initial state vector based on the trailer's pose
                 psi_2, x2, y2 = start_yaw_rad, start_x, start_y
+                # # pick psi_1 randomly in [0, 180], but within ±40° of startyaw
+                # psi_candidates = []
+                # for _ in range(1000):  # try multiple random picks
+                #     candidate = np.random.uniform(np.deg2rad(0), np.deg2rad(180))  # random angle in degrees
+                #     if abs(candidate - start_yaw_rad) < np.deg2rad(40):
+                #         psi_candidates.append(candidate)
+                #
+                # # if no candidate found (e.g. startyaw near 0 or 180), just use startyaw
+                # if psi_candidates:
+                #     psi_1 = np.random.choice(psi_candidates)
+                # else:
+                #     psi_1 = start_yaw_rad
                 psi_1 = start_yaw_rad
                 x1 = start_x + env.L2 * np.cos(start_yaw_rad)
                 y1 = start_y + env.L2 * np.sin(start_yaw_rad)
@@ -99,6 +120,16 @@ def generate_heatmap_data(agent, env):
 
                 # Get the initial observation for the agent
                 observation = env.compute_observation(env.state, steering_angle=0.0)
+
+                # Initialize trajectory recording for the first trial of each cell
+                if trial_idx == 0:
+                    cell_trajectory = {
+                        'trailer_x': [env.state[4]],  # x2 - trailer x position
+                        'trailer_y': [env.state[5]],  # y2 - trailer y position
+                        'start_x': start_x,
+                        'start_y': start_y,
+                        'start_yaw_deg': start_yaw_deg
+                    }
 
                 # --- Run the episode ---
                 done = False
@@ -111,10 +142,43 @@ def generate_heatmap_data(agent, env):
                     score += reward
                     observation = observation_
 
+                    # Record trajectory for the first trial
+                    if trial_idx == 0:
+                        cell_trajectory['trailer_x'].append(env.state[4])
+                        cell_trajectory['trailer_y'].append(env.state[5])
+
                 # Record the results for this trial
                 is_success = info.get('success', False)
                 cell_scores.append(score)
                 cell_successes.append(1 if is_success else 0)
+
+                # Finalize trajectory for the first trial
+                if trial_idx == 0:
+                    cell_trajectory['success'] = is_success or env.goal_reached
+
+                # Determine violation type and record trajectory endpoint
+                if is_success or env.goal_reached:
+                    violation_type = 'success'
+                elif env.jackknife:
+                    violation_type = 'jackknife'
+                elif env.out_of_map:
+                    violation_type = 'out_of_map'
+                elif env.goal_passed:
+                    violation_type = 'goal_passed'
+                elif env.max_steps_reached:
+                    violation_type = 'max_steps'
+                else:
+                    # Check if it was excessive backward movement or other failure
+                    violation_type = 'other_failure'
+
+                trajectory_endpoints.append({
+                    'end_x': env.state[4],  # trailer x position
+                    'end_y': env.state[5],  # trailer y position
+                    'start_x': start_x,
+                    'start_y': start_y,
+                    'violation_type': violation_type,
+                    'score': score
+                })
 
             # Aggregate results for the cell
             if cell_scores:
@@ -122,7 +186,132 @@ def generate_heatmap_data(agent, env):
                 success_grid[iy, ix] = np.mean(cell_successes)
                 orientations_data.extend(cell_orientations)
 
-    return reward_grid, success_grid, x_coords, y_coords, orientations_data
+                # Store the trajectory for this cell (from first trial)
+                if cell_trajectory is not None:
+                    trajectories_data.append(cell_trajectory)
+
+    return reward_grid, success_grid, x_coords, y_coords, orientations_data, trajectory_endpoints, trajectories_data
+
+def plot_trajectories(trajectories_data, filename):
+    """
+    Plot trajectories - one per cell, colored by success/failure.
+    """
+    if not trajectories_data:
+        print("No trajectory data available.")
+        return
+
+    print("Generating trajectories plot...")
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    successful_count = 0
+    failed_count = 0
+
+    # Plot each trajectory
+    for traj in trajectories_data:
+        if traj['success']:
+            color = 'green'
+            alpha = 0.7
+            linewidth = 1.5
+            successful_count += 1
+        else:
+            color = 'red'
+            alpha = 0.6
+            linewidth = 1.0
+            failed_count += 1
+
+        # Plot trajectory path
+        ax.plot(traj['trailer_x'], traj['trailer_y'],
+                color=color, alpha=alpha, linewidth=linewidth)
+
+        # Mark start point
+        ax.plot(traj['trailer_x'][0], traj['trailer_y'][0],
+                'o', color=color, markersize=4, markeredgecolor='black',
+                markeredgewidth=0.5, alpha=alpha)
+
+    # Plot the goal pose
+    ax.plot(GOAL_POSE['x'], GOAL_POSE['y'], 'gold', marker='*', markersize=15,
+            markeredgecolor='black', linewidth=2, label='Goal')
+
+    # Create legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='green', linewidth=2, alpha=0.7,
+               label=f'Successful ({successful_count})'),
+        Line2D([0], [0], color='red', linewidth=2, alpha=0.6,
+               label=f'Failed ({failed_count})'),
+        Line2D([0], [0], marker='o', color='black', markersize=4,
+               linewidth=0, label='Start points')
+    ]
+    ax.legend(handles=legend_elements)
+
+    # Formatting
+    ax.set_xlabel('X-coordinate (m)')
+    ax.set_ylabel('Y-coordinate (m)')
+    ax.set_title('Trajectories - One per Grid Cell')
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+    # Save the figure
+    output_path = os.path.join(OUTPUT_DIR, filename)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Trajectories plot saved to {output_path}")
+
+def plot_trajectory_endpoints(trajectory_endpoints, filename):
+    """
+    Plot scatter plot of trajectory end points colored by violation type.
+    """
+    if not trajectory_endpoints:
+        print("No trajectory endpoint data available.")
+        return
+
+    print("Generating trajectory endpoints plot...")
+
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    # Define colors for each violation type
+    violation_colors = {
+        'success': 'green',
+        'jackknife': 'red',
+        'out_of_map': 'orange',
+        'max_steps': 'blue',
+        'goal_passed': 'purple',
+        'other_failure': 'brown'
+    }
+
+    # Group endpoints by violation type
+    violation_groups = {}
+    for endpoint in trajectory_endpoints:
+        vtype = endpoint['violation_type']
+        if vtype not in violation_groups:
+            violation_groups[vtype] = {'x': [], 'y': []}
+        violation_groups[vtype]['x'].append(endpoint['end_x'])
+        violation_groups[vtype]['y'].append(endpoint['end_y'])
+
+    # Plot each violation type
+    for vtype, points in violation_groups.items():
+        color = violation_colors.get(vtype, 'gray')
+        ax.scatter(points['x'], points['y'], c=color, alpha=0.6, s=20,
+                   label=f'{vtype} ({len(points["x"])})')
+
+    # Plot the goal pose
+    ax.plot(GOAL_POSE['x'], GOAL_POSE['y'], 'gold', marker='*', markersize=15,
+            markeredgecolor='black', linewidth=2, label='Goal')
+
+    # Formatting
+    ax.set_xlabel('End X-coordinate (m)')
+    ax.set_ylabel('End Y-coordinate (m)')
+    ax.set_title('Trajectory End Points by Violation Type')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+
+    # Save the figure
+    output_path = os.path.join(OUTPUT_DIR, filename)
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Trajectory endpoints plot saved to {output_path}")
 
 def plot_success_distribution(grid_data, title, filename):
     """
@@ -278,7 +467,7 @@ def main():
 
     # --- Load Saved Models ---
     try:
-        print("🔄 Loading saved models from 'tmp/ddpg/'...")
+        print("📄 Loading saved models from 'tmp/ddpg/'...")
         agent.load_models()
         print("✅ Models loaded successfully!")
     except Exception as e:
@@ -288,10 +477,12 @@ def main():
 
     # --- Generate Data ---
     start_time = time.time()
-    reward_data, success_data, x_coords, y_coords, orientations_data = generate_heatmap_data(agent, env)
+    reward_data, success_data, x_coords, y_coords, orientations_data, trajectory_endpoints, trajectories_data = generate_heatmap_data(agent, env)
     end_time = time.time()
     print(f"\nData generation completed in { (end_time - start_time) / 3600:.2f} hours.")
     print(f"Total orientations tested: {len(orientations_data)}")
+    print(f"Total trajectory endpoints recorded: {len(trajectory_endpoints)}")
+    print(f"Total trajectories recorded: {len(trajectories_data)}")
 
     # --- Plot Heatmaps ---
     plot_heatmap(
@@ -315,15 +506,25 @@ def main():
     )
 
     # --- Plot Value Distribution Bar Graphs ---
-
     plot_success_distribution(
         grid_data=success_data,
         title='Success Rate Distribution',
         filename='distribution_success_rate.png'
     )
 
+    # --- Plot Trajectory End Points ---
+    plot_trajectory_endpoints(
+        trajectory_endpoints=trajectory_endpoints,
+        filename='trajectory_endpoints_by_violation.png'
+    )
 
-    print("\n✅ Heatmap and distribution analysis complete!")
+    # --- Plot Trajectories ---
+    plot_trajectories(
+        trajectories_data=trajectories_data,
+        filename='trajectories_per_cell.png'
+    )
+
+    print("\n✅ Heatmap, trajectory endpoint, and trajectory analysis complete!")
 
 if __name__ == '__main__':
     main()

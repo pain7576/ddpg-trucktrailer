@@ -511,7 +511,7 @@ class LossLandscapeVisualizer:
         ax1 = fig.add_subplot(111, projection='3d')
         A, B = np.meshgrid(alphas, betas)
         surf = ax1.plot_surface(A, B, loss_grid.T, cmap='viridis', alpha=0.8, edgecolor='none')
-        ax1.scatter([0], [0], [self.original_loss], color='red', s=150, label='Your Model', zorder=10)
+        #ax1.scatter([0], [0], [self.original_loss], color='red', s=150, label='Your Model', zorder=10)
         ax1.scatter([min_alpha], [min_beta], [min_loss], color='green', s=150, label='Minimum', zorder=10)
         ax1.set_xlabel('PC1 Direction (α)')
         ax1.set_ylabel('PC2 Direction (β)')
@@ -685,8 +685,8 @@ def quick_visualize_with_saved_models(model_path, data_filename, state_dim, acti
 # Example usage
 if __name__ == "__main__":
     # REPLACE THESE WITH YOUR ACTUAL VALUES:
-    MODEL_PATH = r"C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\best_back.pth"     # Path to your .pth file
-    DATA_FILENAME = r"C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\back.pkl"       # Your replay buffer filename
+    MODEL_PATH = r"C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\best_no_back.pth"     # Path to your .pth file
+    DATA_FILENAME = r"C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\DDPG\noback.pkl"       # Your replay buffer filename
     STATE_DIM = 23                               # Your state dimension
     ACTION_DIM = 1                              # Your action dimension
     MODEL_DIR = 'model'                         # Directory with saved training models

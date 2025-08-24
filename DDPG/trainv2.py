@@ -206,7 +206,7 @@ def prompt_set_parameters():
         return False
 
 
-def save_training_state(episode_num, score_history, best_score, best_success_rate, success_history, total_steps, filename):
+def save_training_state(episode_num, score_history, best_score, best_success_rate, success_history, total_steps, step_history, filename):
     """Save training state for resuming later - ORIGINAL LOGIC PRESERVED"""
     training_state = {
         'episode_num': episode_num,
@@ -215,6 +215,7 @@ def save_training_state(episode_num, score_history, best_score, best_success_rat
         'best_success_rate': best_success_rate,
         'success_history': success_history,
         'total_steps': total_steps,
+        'step_history': step_history,
         'filename': filename
     }
 
@@ -419,6 +420,7 @@ if __name__ == '__main__':
     best_success_rate = 0.0
     score_history = []
     success_history = []
+    step_history = []
     start_episode = 0
     resume_episode = start_episode
     total_steps = 0
@@ -438,6 +440,7 @@ if __name__ == '__main__':
                 resume_episode = training_state['episode_num']
                 #best_success_rate = training_state['best_success_rate']
                 success_history = training_state['success_history']
+                step_history = training_state['step_history']
                 total_steps = training_state.get('total_steps', 0)
                 cli.display_info(f"Resuming from episode {resume_episode}")
                 #cli.display_info(f"Previous best score: {best_score:.2f}")
@@ -530,6 +533,7 @@ if __name__ == '__main__':
         replay_system.save_episode(i, episode_states, episode_actions, episode_reward, env_data)
 
         score_history.append(score)
+        step_history.append(total_steps)
         avg_score = np.mean(score_history[-100:])
 
         if episode_reward[-1]['final_success_bonus'] > 0:
@@ -552,7 +556,7 @@ if __name__ == '__main__':
         # Check if this is a new best score
         if is_best:
             agent.save_models()
-            save_training_state(i + 1, score_history, best_score, best_success_rate, success_history, total_steps, filename)
+            save_training_state(i + 1, score_history, best_score, best_success_rate, success_history, total_steps, step_history, filename)
             save_transitions(i, episode_transitions_history)
             best_success_rate = success_rate
             best_score = avg_score

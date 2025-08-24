@@ -464,6 +464,18 @@ class Truck_trailer_Env_2(gym.Env):
         # Generate valid random start and goal poses
         self.startx, self.starty, self.startyaw, self.goalx, self.goaly, self.goalyaw = self.generate_valid_random_poses()
 
+        # pick psi_1 randomly in [0, 180], but within ±40° of startyaw
+        # psi_candidates = []
+        # for _ in range(1000):  # try multiple random picks
+        #     candidate = np.random.uniform(np.deg2rad(0), np.deg2rad(180))  # random angle in degrees
+        #     if abs(candidate - self.startyaw) < np.deg2rad(40):
+        #         psi_candidates.append(candidate)
+        #
+        # # if no candidate found (e.g. startyaw near 0 or 180), just use startyaw
+        # if psi_candidates:
+        #     psi_1 = np.random.choice(psi_candidates)
+        # else:
+        #     psi_1 = self.startyaw
 
         # Set initial-state from trailer configuration
         x1 = self.startx + self.L2 * np.cos(self.startyaw)
