@@ -440,7 +440,7 @@ if __name__ == '__main__':
                 resume_episode = training_state['episode_num']
                 #best_success_rate = training_state['best_success_rate']
                 success_history = training_state['success_history']
-                step_history = training_state['step_history']
+                #step_history = training_state['step_history']
                 total_steps = training_state.get('total_steps', 0)
                 cli.display_info(f"Resuming from episode {resume_episode}")
                 #cli.display_info(f"Previous best score: {best_score:.2f}")
@@ -475,6 +475,8 @@ if __name__ == '__main__':
         # Start from scratch
         start_episode = 0
         end_episode = n_games
+
+    progress = False
 
     # Enhanced training loop with progress tracking
     cli.display_message(f"🎯 Starting Training: Episodes {start_episode} to {end_episode - 1}", "bold cyan")
@@ -545,6 +547,13 @@ if __name__ == '__main__':
 
         success_history.append(1 if status == "SUCCESS" else 0)
         success_rate = np.mean(success_history[-100:])
+
+        if progress:
+            current_success_percent = int(success_rate * 100)
+            if int(current_success_percent) in [25, 50, 75]:
+                # Pass the integer percentage to the save function
+                agent.save_models_progress(int(current_success_percent))
+
 
         is_better_success = success_rate > best_success_rate
         is_equal_success_better_score = success_rate == best_success_rate and avg_score > best_score

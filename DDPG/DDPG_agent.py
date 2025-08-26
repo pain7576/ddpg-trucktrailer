@@ -57,6 +57,12 @@ class Agent():
         self.critic.save_checkpoint()
         self.target_critic.save_checkpoint()
 
+    def save_models_progress(self,success):
+        self.actor.save_checkpoint_progress(success=success)
+        self.target_actor.save_checkpoint_progress(success=success)
+        self.critic.save_checkpoint_progress(success=success)
+        self.target_critic.save_checkpoint_progress(success=success)
+
     def load_models(self):
         self.actor.load_checkpoint()
         self.target_actor.load_checkpoint()

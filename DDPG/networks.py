@@ -71,6 +71,19 @@ class CriticNetwork(nn.Module):
         print('... saving checkpoint ...')
         T.save(self.state_dict(), self.checkpoint_file)
 
+    def save_checkpoint_progress(self, success):
+        print(f'... saving checkpoint progress for {success}% success ...')
+
+        # 1. Define the directory for this progress checkpoint
+        progress_chkpt_dir = os.path.join(self.checkpoint_dir, str(success))
+        os.makedirs(progress_chkpt_dir, exist_ok=True)
+
+        # 2. Define the file path *inside* the new directory
+        progress_checkpoint_file = os.path.join(progress_chkpt_dir, self.name + '_ddpg')
+
+        # 3. Save the model to the new, correct path
+        T.save(self.state_dict(), progress_checkpoint_file)
+
     def load_checkpoint(self):
         print('... loading checkpoint ...')
         self.load_state_dict(T.load(self.checkpoint_file))
@@ -137,6 +150,19 @@ class ActorNetwork(nn.Module):
         print('... saving checkpoint ...')
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         T.save(self.state_dict(), self.checkpoint_file)
+
+    def save_checkpoint_progress(self, success):
+        print(f'... saving checkpoint progress for {success}% success ...')
+
+        # 1. Define the directory for this progress checkpoint
+        progress_chkpt_dir = os.path.join(self.checkpoint_dir, str(success))
+        os.makedirs(progress_chkpt_dir, exist_ok=True)
+
+        # 2. Define the file path *inside* the new directory
+        progress_checkpoint_file = os.path.join(progress_chkpt_dir, self.name + '_ddpg')
+
+        # 3. Save the model to the new, correct path
+        T.save(self.state_dict(), progress_checkpoint_file)
 
     def load_checkpoint(self):
         print('... loading checkpoint ...')
