@@ -440,7 +440,7 @@ if __name__ == '__main__':
                 resume_episode = training_state['episode_num']
                 #best_success_rate = training_state['best_success_rate']
                 success_history = training_state['success_history']
-                #step_history = training_state['step_history']
+                step_history = training_state['step_history']
                 total_steps = training_state.get('total_steps', 0)
                 cli.display_info(f"Resuming from episode {resume_episode}")
                 #cli.display_info(f"Previous best score: {best_score:.2f}")
