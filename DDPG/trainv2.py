@@ -101,7 +101,7 @@ class RichCLI:
 
         self.console.print(config_table)
 
-    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, total_steps,is_best=False):
+    def display_episode_result(self, episode, score, avg_score, best_score, best_success_rate, success, total_steps, success_rate, is_best=False):
         """Display episode results with beautiful formatting"""
         # Colorize success: red if "FAILURE", else green
         success_display = (
@@ -124,7 +124,8 @@ class RichCLI:
                 f"Score:[yellow]{score:8.1f}[/yellow]|"
                 f"Avg:[cyan]{avg_score:8.1f}[/cyan]|"
                 f"goal:{success_display}|"
-                f"rate:[green]{best_success_rate:8.3f}[/green]|"
+                f"rate:[green]{success_rate:8.3f}[/green]|"
+                f"best_rate:[green]{best_success_rate:8.3f}[/green]|"
                 f"Best:[green]{best_score:8.1f}[/green]|"
                 f"Steps:[magenta]{total_steps}[/magenta]"
             )
@@ -572,7 +573,7 @@ if __name__ == '__main__':
 
 
         # Enhanced display but original print logic preserved
-        cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, total_steps, is_best)
+        cli.display_episode_result(i, score, avg_score, best_score, best_success_rate, status, total_steps, success_rate, is_best)
 
         try:
             if keyboard.is_pressed('escape'):

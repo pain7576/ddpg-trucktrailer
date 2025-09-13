@@ -113,4 +113,4 @@ class HistoryAnimator:
 if __name__ == "__main__":
     folder = r"C:\Users\harsh\OneDrive\Desktop\truck_trailer_DDPG\Results\final_stage2_smooth\episode_replays"
     animator = HistoryAnimator(folder_path=folder, chunk_size=50)
-    animator.animate()  # or animator.animate("episodes_chunks.mp4", fps=1)
+    animator.animate()  # or animator.animate("episodes_chunks.gif", fps=1)
