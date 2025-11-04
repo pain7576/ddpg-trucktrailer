@@ -2,6 +2,10 @@ import pickle
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import imageio
+import pygame
+from PIL import Image
 
 
 class EpisodeReplaySystem:
@@ -210,8 +214,22 @@ class EpisodeReplaySystem:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def replay_episode(self, episode_num, reward_for_filename):
-        """Load and replay a specific episode"""
+    def _get_fig_as_image(self, fig):
+        """Converts a matplotlib figure (any backend) to a PIL Image safely."""
+        # Create an Agg canvas and draw the figure onto it
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        img_np = np.asarray(buf, dtype=np.uint8)[..., :3]  # Drop alpha channel
+        return Image.fromarray(img_np)
+
+    def _get_pygame_as_image(self):
+        """Not used: env uses Matplotlib, not Pygame."""
+        return Image.new('RGB', (800, 600), (255, 255, 255))
+
+    def replay_episode(self, episode_num, reward_for_filename, save_gif=False, gif_fps=10):
+        """Load and replay a specific episode, saving two GIFs:
+           (1) env only, (2) plots only (reward + twin graphs)."""
         filepath = os.path.join(self.save_dir, f'episode_{episode_num}_reward_{reward_for_filename}.pkl')
 
         if not os.path.exists(filepath):
@@ -225,6 +243,9 @@ class EpisodeReplaySystem:
         actions = episode_data['actions']
         env_data = episode_data.get('env_data', None)
         self.reward_info = episode_data['info']
+
+        gif_frames_env = []   # 🆕 for environment-only GIF
+        gif_frames_plots = [] # 🆕 for plots-only GIF
 
         # Reset tracking variables for new episode
         self.cumulative_rewards = []
@@ -247,32 +268,27 @@ class EpisodeReplaySystem:
             self.env.max_episode_steps = self.env.compute_max_steps()
             self.env.episode_steps = 0
         else:
-            # If no env_data available, call reset to generate new random scenario
             print("No environment data found, generating new random scenario...")
             self.env.reset()
-            self.env.state = states[0]  # Override with saved initial state
+            self.env.state = states[0]
 
         # Create two separate figure windows
-        self.fig, self.ax = plt.subplots(figsize=(12, 6))  # Reward components plot
-        self.fig_twin, self.ax1 = plt.subplots(figsize=(12, 6))  # Twin plot
-        self.ax2 = self.ax1.twinx()  # Create twin y-axis
+        self.fig, self.ax = plt.subplots(figsize=(12, 6))       # Reward components plot
+        self.fig_twin, self.ax1 = plt.subplots(figsize=(12, 6)) # Twin plot
+        self.ax2 = self.ax1.twinx()                             # Twin y-axis
 
-        plt.ion()  # Turn on interactive mode
+        plt.ion()
         self.fig.show()
         self.fig_twin.show()
 
         # Render initial state
         self.env.render()
 
-        # Initialize cumulative reward to 0
         cumulative_reward = 0
 
-        # Step through the episode
         for i in range(len(actions)):
-            # Apply the recorded action
             observation, reward, done, info = self.env.step(actions[i])
 
-            # Update cumulative reward and action tracking
             step_reward = self.reward_info[i]['total_reward']
             cumulative_reward += step_reward
             self.cumulative_rewards.append(cumulative_reward)
@@ -282,10 +298,43 @@ class EpisodeReplaySystem:
             self.env.render()
             self.plot_reward_components(i)
             self.plot_twin_graph(i)
+            plt.pause(0.001)
+
+            if save_gif:
+                # 🆕 Capture each figure separately
+                env_img = self._get_fig_as_image(self.env.fig)
+                reward_plot_img = self._get_fig_as_image(self.fig)
+                twin_plot_img = self._get_fig_as_image(self.fig_twin)
+
+                # 🆕 Combine the two plots side by side
+                plot_w, plot_h = reward_plot_img.size
+                twin_plot_resized = twin_plot_img.resize((plot_w, plot_h), Image.Resampling.LANCZOS)
+                combined_plots = Image.new('RGB', (plot_w * 2, plot_h), (255, 255, 255))
+                combined_plots.paste(reward_plot_img, (0, 0))
+                combined_plots.paste(twin_plot_resized, (plot_w, 0))
+
+                # 🆕 Save both GIF frames separately
+                gif_frames_env.append(np.array(env_img))
+                gif_frames_plots.append(np.array(combined_plots))
 
             if done:
                 print(f"Episode ended at step {i + 1}")
                 break
+
+        if save_gif:
+            # 🆕 Save environment-only GIF
+            env_gif_filename = f'replay_episode_{episode_num}_reward_{reward_for_filename}_env.gif'
+            env_gif_filepath = os.path.join(self.save_dir, env_gif_filename)
+            print(f"\nSaving environment GIF to {env_gif_filepath}...")
+            imageio.mimsave(env_gif_filepath, gif_frames_env, fps=gif_fps)
+
+            # 🆕 Save plots-only GIF
+            plots_gif_filename = f'replay_episode_{episode_num}_reward_{reward_for_filename}_plots.gif'
+            plots_gif_filepath = os.path.join(self.save_dir, plots_gif_filename)
+            print(f"Saving plots GIF to {plots_gif_filepath}...")
+            imageio.mimsave(plots_gif_filepath, gif_frames_plots, fps=gif_fps)
+
+            print("Both GIFs saved successfully!")
 
         print("Replay complete!")
         plt.show(block=True)
