@@ -227,7 +227,7 @@ class EpisodeReplaySystem:
         """Not used: env uses Matplotlib, not Pygame."""
         return Image.new('RGB', (800, 600), (255, 255, 255))
 
-    def replay_episode(self, episode_num, reward_for_filename, save_gif=False, gif_fps=10):
+    def replay_episode(self, episode_num, reward_for_filename, save_gif=True, gif_fps=10):
         """Load and replay a specific episode, saving two GIFs:
            (1) env only, (2) plots only (reward + twin graphs)."""
         filepath = os.path.join(self.save_dir, f'episode_{episode_num}_reward_{reward_for_filename}.pkl')
@@ -326,13 +326,13 @@ class EpisodeReplaySystem:
             env_gif_filename = f'replay_episode_{episode_num}_reward_{reward_for_filename}_env.gif'
             env_gif_filepath = os.path.join(self.save_dir, env_gif_filename)
             print(f"\nSaving environment GIF to {env_gif_filepath}...")
-            imageio.mimsave(env_gif_filepath, gif_frames_env, fps=gif_fps)
+            imageio.mimsave(env_gif_filepath, gif_frames_env, fps=gif_fps, loop=0)
 
             # 🆕 Save plots-only GIF
             plots_gif_filename = f'replay_episode_{episode_num}_reward_{reward_for_filename}_plots.gif'
             plots_gif_filepath = os.path.join(self.save_dir, plots_gif_filename)
             print(f"Saving plots GIF to {plots_gif_filepath}...")
-            imageio.mimsave(plots_gif_filepath, gif_frames_plots, fps=gif_fps)
+            imageio.mimsave(plots_gif_filepath, gif_frames_plots, fps=gif_fps, loop=0)
 
             print("Both GIFs saved successfully!")
 

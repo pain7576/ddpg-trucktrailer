@@ -5,7 +5,9 @@ A Deep Deterministic Policy Gradient (DDPG) reinforcement learning implementatio
 ## Overview
 
 This project implements a DDPG agent that learns to control the steering angle of a truck to back a trailer into a target position and orientation. The task is challenging due to the kinematic constraints of the articulated vehicle system and the counter-intuitive control dynamics when moving in reverse.
+![Replay 1](DDPG/episode_replays/replay_episode_10579_reward_4792_env.gif)
 
+![Replay 1](DDPG/episode_replays/replay_episode_10579_reward_4792_plots.gif)
 ## Features
 
 ### Core Components
